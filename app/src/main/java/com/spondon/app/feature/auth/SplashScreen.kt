@@ -10,23 +10,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.spondon.app.core.ui.components.BloodDropLoader
 import com.spondon.app.core.ui.theme.BloodRed
+import com.spondon.app.core.ui.theme.SoftRose
 import com.spondon.app.navigation.Routes
 import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(
     navController: NavController,
-    // NOTE: AuthViewModel removed temporarily — Firebase is not configured yet.
-    // Uncomment `viewModel: AuthViewModel = hiltViewModel()` and restore auth logic
-    // after adding google-services.json.
+    viewModel: AuthViewModel = hiltViewModel(),
 ) {
+    val state by viewModel.state.collectAsState()
+
     // Entrance animation values
     val logoAlpha = remember { Animatable(0f) }
     val nameAlpha = remember { Animatable(0f) }
@@ -41,16 +44,14 @@ fun SplashScreen(
         taglineAlpha.animateTo(1f, animationSpec = tween(500))
         delay(800)
 
-        // TODO: Restore auth-based navigation after adding google-services.json:
-        //   val state = viewModel.state.value
-        //   val destination = when {
-        //       !state.isOnboardingComplete -> Routes.Onboarding.route
-        //       state.isLoggedIn && !state.needsProfileSetup -> Routes.Home.route
-        //       state.isLoggedIn && state.needsProfileSetup -> Routes.DonorProfileSetup.route
-        //       else -> Routes.Login.route
-        //   }
-        // For now, skip auth and go directly to Home:
-        navController.navigate(Routes.Home.route) {
+        // Auth-based navigation (Firebase is now configured)
+        val destination = when {
+            !state.isOnboardingComplete -> Routes.Onboarding.route
+            state.isLoggedIn && !state.needsProfileSetup -> Routes.Home.route
+            state.isLoggedIn && state.needsProfileSetup -> Routes.DonorProfileSetup.route
+            else -> Routes.Login.route
+        }
+        navController.navigate(destination) {
             popUpTo(Routes.Splash.route) { inclusive = true }
         }
     }
@@ -58,7 +59,15 @@ fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        BloodRed.copy(alpha = 0.05f),
+                        MaterialTheme.colorScheme.background,
+                    ),
+                    radius = 800f,
+                ),
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -79,7 +88,7 @@ fun SplashScreen(
             Text(
                 text = "স্পন্দন",
                 style = MaterialTheme.typography.displayLarge.copy(
-                    fontSize = 40.sp,
+                    fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
                 ),
                 color = BloodRed,

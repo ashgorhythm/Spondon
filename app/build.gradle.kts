@@ -4,17 +4,17 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
-    // alias(libs.plugins.google.services) // TODO: Uncomment after adding google-services.json
+    alias(libs.plugins.google.services) // Firebase — google-services.json is present
 }
 
 android {
     namespace = "com.spondon.app"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.spondon.app"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

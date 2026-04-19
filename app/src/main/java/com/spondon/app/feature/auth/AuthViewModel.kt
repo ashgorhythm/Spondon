@@ -2,6 +2,7 @@ package com.spondon.app.feature.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.PhoneAuthCredential
 import com.spondon.app.core.common.Resource
 import com.spondon.app.core.data.local.PreferencesManager
 import com.spondon.app.core.data.repository.AuthRepository
@@ -315,6 +316,39 @@ class AuthViewModel @Inject constructor(
     // ─── Utility ─────────────────────────────────────────────
 
     fun clearError() = _state.update { it.copy(error = null) }
+
+    // ─── Activity-bridge helpers ─────────────────────────────
+
+    /** Called by MainActivity when Google Sign-In fails before we get an id token. */
+    fun setError(msg: String) = _state.update { it.copy(error = msg, isLoading = false) }
+
+    /** Shows the loading spinner while OTP is being sent (Activity layer). */
+    fun setOtpLoading(loading: Boolean) = _state.update { it.copy(isLoading = loading) }
+
+    /** Allows MainActivity to run a suspend block on the ViewModel's scope. */
+    fun launchOnScope(block: suspend () -> Unit) {
+        viewModelScope.launch { block() }
+    }
+
+    /**
+     * Signs in using a [PhoneAuthCredential] obtained from auto-verification
+     * (called from MainActivity's PhoneAuthProvider callbacks).
+     */
+    fun signInWithPhoneCredential(credential: PhoneAuthCredential) {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            try {
+                // Delegate to the repository's verifyOtp by reusing the credential directly
+                when (val result = authRepository.signInWithPhoneCredential(credential)) {
+                    is Resource.Success -> _state.update { it.copy(isLoading = false, isLoginComplete = true) }
+                    is Resource.Error   -> _state.update { it.copy(isLoading = false, error = result.message) }
+                    is Resource.Loading -> {}
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(isLoading = false, error = e.message ?: "Sign in failed") }
+            }
+        }
+    }
 }
 
 enum class PasswordStrength { WEAK, FAIR, STRONG }

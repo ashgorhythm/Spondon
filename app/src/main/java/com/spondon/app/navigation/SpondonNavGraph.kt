@@ -2,9 +2,6 @@ package com.spondon.app.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -18,7 +15,10 @@ import com.spondon.app.feature.request.*
 import com.spondon.app.feature.settings.SettingsScreen
 
 @Composable
-fun SpondonNavGraph() {
+fun SpondonNavGraph(
+    onGoogleSignIn: () -> Unit = {},
+    onSendOtp: (String) -> Unit = {},
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -30,11 +30,26 @@ fun SpondonNavGraph() {
         // ─── Auth Flow ───────────────────────────────────────
         composable(Routes.Splash.route) { SplashScreen(navController) }
         composable(Routes.Onboarding.route) { OnboardingScreen(navController) }
-        composable(Routes.Login.route) { LoginScreen(navController) }
-        composable(Routes.SignUp.route) { SignUpScreen(navController) }
+        composable(Routes.Login.route) {
+            LoginScreen(
+                navController = navController,
+                onGoogleSignIn = onGoogleSignIn,
+            )
+        }
+        composable(Routes.SignUp.route) {
+            SignUpScreen(
+                navController = navController,
+                onGoogleSignIn = onGoogleSignIn,
+            )
+        }
         composable(Routes.DonorProfileSetup.route) { DonorProfileSetupScreen(navController) }
         composable(Routes.LocationSetup.route) { LocationSetupScreen(navController) }
-        composable(Routes.Otp.route) { OtpScreen(navController) }
+        composable(Routes.Otp.route) {
+            OtpScreen(
+                navController = navController,
+                onSendOtp = onSendOtp,
+            )
+        }
         composable(Routes.ForgotPassword.route) { ForgotPasswordScreen(navController) }
 
         // ─── Main ────────────────────────────────────────────

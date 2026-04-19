@@ -2,6 +2,8 @@ package com.spondon.app.core.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.PhoneAuthCredential
+import com.google.firebase.auth.PhoneAuthProvider
 import com.spondon.app.core.common.Resource
 import com.spondon.app.core.data.remote.FirestoreService
 import com.spondon.app.core.domain.model.User
@@ -124,11 +126,20 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun verifyOtp(verificationId: String, code: String): Resource<Boolean> {
         return try {
-            val credential = com.google.firebase.auth.PhoneAuthProvider.getCredential(verificationId, code)
+            val credential = PhoneAuthProvider.getCredential(verificationId, code)
             auth.signInWithCredential(credential).await()
             Resource.Success(true)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "OTP verification failed", e)
+        }
+    }
+
+    override suspend fun signInWithPhoneCredential(credential: PhoneAuthCredential): Resource<Boolean> {
+        return try {
+            auth.signInWithCredential(credential).await()
+            Resource.Success(true)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Phone sign in failed", e)
         }
     }
 
