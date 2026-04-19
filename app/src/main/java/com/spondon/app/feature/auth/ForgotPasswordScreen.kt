@@ -23,7 +23,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.spondon.app.core.ui.components.BloodDropLoader
 import com.spondon.app.core.ui.components.SpondonButton
@@ -35,7 +34,7 @@ import com.spondon.app.navigation.Routes
 @Composable
 fun ForgotPasswordScreen(
     navController: NavController,
-    viewModel: AuthViewModel = hiltViewModel(),
+    viewModel: AuthViewModel,
 ) {
     val state by viewModel.state.collectAsState()
     val scrollState = rememberScrollState()

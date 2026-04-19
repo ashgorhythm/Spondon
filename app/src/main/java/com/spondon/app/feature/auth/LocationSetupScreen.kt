@@ -1,33 +1,70 @@
 package com.spondon.app.feature.auth
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.LocationCity
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.spondon.app.core.ui.components.SpondonButton
 import com.spondon.app.core.ui.components.StepProgressBar
-import com.spondon.app.core.ui.theme.*
+import com.spondon.app.core.ui.theme.AvailableGreen
+import com.spondon.app.core.ui.theme.BloodRed
+import com.spondon.app.core.ui.theme.UrgencyCritical
 import com.spondon.app.navigation.Routes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LocationSetupScreen(
     navController: NavController,
-    viewModel: AuthViewModel = hiltViewModel(),
+    viewModel: AuthViewModel,
 ) {
     val state by viewModel.state.collectAsState()
     val scrollState = rememberScrollState()
@@ -35,10 +72,28 @@ fun LocationSetupScreen(
     var districtExpanded by remember { mutableStateOf(false) }
     var upazilaExpanded by remember { mutableStateOf(false) }
 
+    // Use the ViewModel state directly — no local copies that can drift.
+    val selectedDistrict = state.selectedDistrict
+    val selectedUpazila = state.selectedUpazila
+
     val districts = BangladeshData.districtNames
-    val upazilas = if (state.selectedDistrict.isNotEmpty()) {
-        BangladeshData.getUpazilas(state.selectedDistrict)
-    } else emptyList()
+
+    // Derive upazila list safely from the current district
+    val upazilas by remember(selectedDistrict) {
+        derivedStateOf {
+            if (selectedDistrict.isNotEmpty()) {
+                BangladeshData.getUpazilas(selectedDistrict)
+            } else {
+                emptyList()
+            }
+        }
+    }
+
+    // Determine if the upazila section should be shown.
+    // Using a derived boolean prevents flicker/crash from rapid recomposition.
+    val showUpazila by remember(selectedDistrict) {
+        derivedStateOf { selectedDistrict.isNotEmpty() }
+    }
 
     // Navigate to home on successful sign-up
     LaunchedEffect(state.isSignUpComplete) {
@@ -68,7 +123,7 @@ fun LocationSetupScreen(
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
                 .verticalScroll(scrollState)
                 .padding(24.dp),
         ) {
@@ -109,7 +164,7 @@ fun LocationSetupScreen(
                 onExpandedChange = { districtExpanded = !districtExpanded },
             ) {
                 OutlinedTextField(
-                    value = state.selectedDistrict,
+                    value = selectedDistrict,
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Select District") },
@@ -128,6 +183,8 @@ fun LocationSetupScreen(
                         DropdownMenuItem(
                             text = { Text(district) },
                             onClick = {
+                                // Close upazila dropdown first to prevent stale state
+                                upazilaExpanded = false
                                 viewModel.selectDistrict(district)
                                 districtExpanded = false
                             },
@@ -138,10 +195,11 @@ fun LocationSetupScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Upazila Picker
+            // Upazila Picker — guarded with stable visibility flag
             AnimatedVisibility(
-                visible = state.selectedDistrict.isNotEmpty(),
+                visible = showUpazila,
                 enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
             ) {
                 Column {
                     Text(
@@ -152,10 +210,15 @@ fun LocationSetupScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     ExposedDropdownMenuBox(
                         expanded = upazilaExpanded,
-                        onExpandedChange = { upazilaExpanded = !upazilaExpanded },
+                        onExpandedChange = {
+                            // Only allow expanding if we have upazilas to show
+                            if (upazilas.isNotEmpty()) {
+                                upazilaExpanded = !upazilaExpanded
+                            }
+                        },
                     ) {
                         OutlinedTextField(
-                            value = state.selectedUpazila,
+                            value = selectedUpazila,
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Select Upazila") },
@@ -228,7 +291,7 @@ fun LocationSetupScreen(
             }
 
             // Selected location summary
-            if (state.selectedDistrict.isNotEmpty() && state.selectedUpazila.isNotEmpty()) {
+            if (selectedDistrict.isNotEmpty() && selectedUpazila.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(20.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -243,12 +306,12 @@ fun LocationSetupScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = state.selectedUpazila,
+                                text = selectedUpazila,
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                             Text(
-                                text = state.selectedDistrict,
+                                text = selectedDistrict,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                             )

@@ -27,7 +27,6 @@
 | **Platform** | Android (Jetpack Compose) |
 | **Backend** | Firebase (Firestore, Auth, FCM, Storage) |
 | **Architecture** | MVVM + Clean Architecture |
-| **Donation Interval** | 120 days (4 months) default; admin can override at ≥ 90 days |
 | **Total Phases** | 6 |
 | **Min SDK** | API 26 (Android 8.0) |
 | **Target SDK** | API 35 |
@@ -265,13 +264,6 @@ users/{userId}
 ---
 
 ## 🚀 Getting Started
-
-### Prerequisites
-
-- Android Studio Hedgehog (or later)
-- JDK 17
-- Android SDK (API 26+)
-- Firebase project with Firestore, Auth, Storage, FCM enabled
 
 ### Setup
 

@@ -29,7 +29,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.spondon.app.core.ui.components.AuthOverlayState
 import com.spondon.app.core.ui.components.AuthStateOverlay
@@ -43,7 +42,7 @@ import kotlinx.coroutines.delay
 fun OtpScreen(
     navController: NavController,
     onSendOtp: (String) -> Unit = {},
-    viewModel: AuthViewModel = hiltViewModel(),
+    viewModel: AuthViewModel,
 ) {
     val state by viewModel.state.collectAsState()
     val focusManager = LocalFocusManager.current

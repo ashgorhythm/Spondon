@@ -21,7 +21,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.spondon.app.core.ui.components.BloodDropLoader
 import com.spondon.app.core.ui.theme.*
@@ -39,7 +38,7 @@ data class OnboardingPage(
 @Composable
 fun OnboardingScreen(
     navController: NavController,
-    viewModel: AuthViewModel = hiltViewModel(),
+    viewModel: AuthViewModel,
 ) {
     val pages = listOf(
         OnboardingPage(
@@ -50,7 +49,7 @@ fun OnboardingScreen(
         ),
         OnboardingPage(
             title = "Find Your Community",
-            titleBn = "আপনার সম্প্রদায় খুঁজুন",
+            titleBn = "আপনার কমিউনিটি খুঁজুন",
             description = "Connect with local blood donor communities. Get matched with nearby donors and requests in your area.",
             accentColor = SoftRose,
         ),

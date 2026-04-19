@@ -2,9 +2,11 @@ package com.spondon.app.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import com.spondon.app.feature.auth.*
 import com.spondon.app.feature.community.*
@@ -25,32 +27,66 @@ fun SpondonNavGraph(
 
     NavHost(
         navController = navController,
-        startDestination = Routes.Splash.route
+        startDestination = "auth_flow"
     ) {
-        // ─── Auth Flow ───────────────────────────────────────
-        composable(Routes.Splash.route) { SplashScreen(navController) }
-        composable(Routes.Onboarding.route) { OnboardingScreen(navController) }
-        composable(Routes.Login.route) {
-            LoginScreen(
-                navController = navController,
-                onGoogleSignIn = onGoogleSignIn,
-            )
+        // ─── Auth Flow (nested graph — shares a single AuthViewModel) ───
+        navigation(
+            startDestination = Routes.Splash.route,
+            route = "auth_flow",
+        ) {
+            composable(Routes.Splash.route) { entry ->
+                val parentEntry = navController.getBackStackEntry("auth_flow")
+                val sharedViewModel: AuthViewModel = hiltViewModel(parentEntry)
+                SplashScreen(navController, sharedViewModel)
+            }
+            composable(Routes.Onboarding.route) { entry ->
+                val parentEntry = navController.getBackStackEntry("auth_flow")
+                val sharedViewModel: AuthViewModel = hiltViewModel(parentEntry)
+                OnboardingScreen(navController, sharedViewModel)
+            }
+            composable(Routes.Login.route) { entry ->
+                val parentEntry = navController.getBackStackEntry("auth_flow")
+                val sharedViewModel: AuthViewModel = hiltViewModel(parentEntry)
+                LoginScreen(
+                    navController = navController,
+                    onGoogleSignIn = onGoogleSignIn,
+                    viewModel = sharedViewModel,
+                )
+            }
+            composable(Routes.SignUp.route) { entry ->
+                val parentEntry = navController.getBackStackEntry("auth_flow")
+                val sharedViewModel: AuthViewModel = hiltViewModel(parentEntry)
+                SignUpScreen(
+                    navController = navController,
+                    onGoogleSignIn = onGoogleSignIn,
+                    viewModel = sharedViewModel,
+                )
+            }
+            composable(Routes.DonorProfileSetup.route) { entry ->
+                val parentEntry = navController.getBackStackEntry("auth_flow")
+                val sharedViewModel: AuthViewModel = hiltViewModel(parentEntry)
+                DonorProfileSetupScreen(navController, sharedViewModel)
+            }
+            composable(Routes.LocationSetup.route) { entry ->
+                val parentEntry = navController.getBackStackEntry("auth_flow")
+                val sharedViewModel: AuthViewModel = hiltViewModel(parentEntry)
+                LocationSetupScreen(navController, sharedViewModel)
+            }
+            composable(Routes.Otp.route) { entry ->
+                val parentEntry = navController.getBackStackEntry("auth_flow")
+                val sharedViewModel: AuthViewModel = hiltViewModel(parentEntry)
+                OtpScreen(
+                    navController = navController,
+                    onSendOtp = onSendOtp,
+                    viewModel = sharedViewModel,
+                )
+            }
+            composable(Routes.ForgotPassword.route) { entry ->
+                val parentEntry = navController.getBackStackEntry("auth_flow")
+                val sharedViewModel: AuthViewModel = hiltViewModel(parentEntry)
+                ForgotPasswordScreen(navController, sharedViewModel)
+            }
         }
-        composable(Routes.SignUp.route) {
-            SignUpScreen(
-                navController = navController,
-                onGoogleSignIn = onGoogleSignIn,
-            )
-        }
-        composable(Routes.DonorProfileSetup.route) { DonorProfileSetupScreen(navController) }
-        composable(Routes.LocationSetup.route) { LocationSetupScreen(navController) }
-        composable(Routes.Otp.route) {
-            OtpScreen(
-                navController = navController,
-                onSendOtp = onSendOtp,
-            )
-        }
-        composable(Routes.ForgotPassword.route) { ForgotPasswordScreen(navController) }
 
         // ─── Main ────────────────────────────────────────────
         composable(Routes.Home.route) { HomeScreen(navController) }

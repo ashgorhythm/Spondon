@@ -30,7 +30,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.spondon.app.core.ui.components.AuthOverlayState
 import com.spondon.app.core.ui.components.AuthStateOverlay
@@ -45,7 +44,7 @@ import kotlinx.coroutines.delay
 fun LoginScreen(
     navController: NavController,
     onGoogleSignIn: () -> Unit = {},
-    viewModel: AuthViewModel = hiltViewModel(),
+    viewModel: AuthViewModel,
 ) {
     val state by viewModel.state.collectAsState()
     val scrollState = rememberScrollState()

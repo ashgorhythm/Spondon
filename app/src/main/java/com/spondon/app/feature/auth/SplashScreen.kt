@@ -15,7 +15,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.spondon.app.core.ui.components.BloodDropLoader
 import com.spondon.app.core.ui.theme.BloodRed
@@ -26,7 +25,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun SplashScreen(
     navController: NavController,
-    viewModel: AuthViewModel = hiltViewModel(),
+    viewModel: AuthViewModel,
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -73,6 +72,7 @@ fun SplashScreen(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(horizontal = 32.dp),
         ) {
             // Animated blood drop logo
             BloodDropLoader(
@@ -84,16 +84,24 @@ fun SplashScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // App name in Bangla
+            // App name in Bangla — keep on a single line, prevent word wrapping
             Text(
                 text = "স্পন্দন",
                 style = MaterialTheme.typography.displayLarge.copy(
-                    fontSize = 30.sp,
+                    fontSize = 36.sp,
                     fontWeight = FontWeight.Bold,
+                    lineHeight = 44.sp,
                 ),
                 color = BloodRed,
-                modifier = Modifier.alpha(nameAlpha.value),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier
+                    .alpha(nameAlpha.value)
+                    .fillMaxWidth(),
             )
+
+            Spacer(modifier = Modifier.height(4.dp))
 
             // App name in English
             Text(
@@ -103,7 +111,10 @@ fun SplashScreen(
                     letterSpacing = 4.sp,
                 ),
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                modifier = Modifier.alpha(nameAlpha.value),
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .alpha(nameAlpha.value)
+                    .fillMaxWidth(),
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -116,7 +127,9 @@ fun SplashScreen(
                 ),
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
                 textAlign = TextAlign.Center,
-                modifier = Modifier.alpha(taglineAlpha.value),
+                modifier = Modifier
+                    .alpha(taglineAlpha.value)
+                    .fillMaxWidth(),
             )
         }
     }
