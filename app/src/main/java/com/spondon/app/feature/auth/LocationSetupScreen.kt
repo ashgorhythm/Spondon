@@ -95,11 +95,16 @@ fun LocationSetupScreen(
         derivedStateOf { selectedDistrict.isNotEmpty() }
     }
 
-    // Navigate to home on successful sign-up
-    LaunchedEffect(state.isSignUpComplete) {
-        if (state.isSignUpComplete) {
-            navController.navigate(Routes.Home.route) {
-                popUpTo(Routes.Splash.route) { inclusive = true }
+    // Navigate to home on successful sign-up via one-shot event
+    LaunchedEffect(Unit) {
+        viewModel.navigationEvent.collect { event ->
+            when (event) {
+                is AuthNavigationEvent.NavigateToHome -> {
+                    navController.navigate(Routes.Home.route) {
+                        popUpTo(Routes.Splash.route) { inclusive = true }
+                    }
+                }
+                else -> {}
             }
         }
     }

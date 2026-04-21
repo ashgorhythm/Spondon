@@ -10,6 +10,7 @@ sealed class Routes(val route: String) {
     data object LocationSetup : Routes("location_setup")
     data object Otp : Routes("otp/{phone}")
     data object ForgotPassword : Routes("forgot_password")
+    data object PhoneLogin : Routes("phone_login")
 
     // Main
     data object Home : Routes("home")

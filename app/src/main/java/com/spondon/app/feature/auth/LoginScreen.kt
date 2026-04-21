@@ -1,28 +1,65 @@
 package com.spondon.app.feature.auth
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseOutBack
+import androidx.compose.animation.core.EaseOutCubic
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Fingerprint
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -36,7 +73,9 @@ import com.spondon.app.core.ui.components.AuthStateOverlay
 import com.spondon.app.core.ui.components.BloodDropLoader
 import com.spondon.app.core.ui.components.SpondonButton
 import com.spondon.app.core.ui.components.SpondonTextField
-import com.spondon.app.core.ui.theme.*
+import com.spondon.app.core.ui.theme.BloodRed
+import com.spondon.app.core.ui.theme.SoftRose
+import com.spondon.app.core.ui.theme.UrgencyCritical
 import com.spondon.app.navigation.Routes
 import kotlinx.coroutines.delay
 
@@ -44,6 +83,7 @@ import kotlinx.coroutines.delay
 fun LoginScreen(
     navController: NavController,
     onGoogleSignIn: () -> Unit = {},
+    onSendOtp: (String) -> Unit = {},
     viewModel: AuthViewModel,
 ) {
     val state by viewModel.state.collectAsState()
@@ -83,25 +123,26 @@ fun LoginScreen(
         }
     }
 
-    // Track login success → show heartbeat blood drop → navigate
-    LaunchedEffect(state.isLoginComplete) {
-        if (state.isLoginComplete) {
-            overlayState = AuthOverlayState.SUCCESS
-            delay(1200) // Show success animation briefly
-            navController.navigate(Routes.Home.route) {
-                popUpTo(Routes.Login.route) { inclusive = true }
-            }
-        }
-    }
-
-    // Track profile setup needed
-    LaunchedEffect(state.needsProfileSetup) {
-        if (state.needsProfileSetup) {
-            overlayState = AuthOverlayState.SUCCESS
-            overlayMessage = "Almost there..."
-            delay(800)
-            navController.navigate(Routes.DonorProfileSetup.route) {
-                popUpTo(Routes.Login.route) { inclusive = true }
+    // ── One-shot navigation events (prevents crash-on-reopen) ──
+    LaunchedEffect(Unit) {
+        viewModel.navigationEvent.collect { event ->
+            when (event) {
+                is AuthNavigationEvent.NavigateToHome -> {
+                    overlayState = AuthOverlayState.SUCCESS
+                    delay(1200)
+                    navController.navigate(Routes.Home.route) {
+                        popUpTo(Routes.Login.route) { inclusive = true }
+                    }
+                }
+                is AuthNavigationEvent.NavigateToProfileSetup -> {
+                    overlayState = AuthOverlayState.SUCCESS
+                    overlayMessage = "Almost there..."
+                    delay(800)
+                    navController.navigate(Routes.DonorProfileSetup.route) {
+                        popUpTo(Routes.Login.route) { inclusive = true }
+                    }
+                }
+                else -> {} // Other events handled by other screens
             }
         }
     }
@@ -354,9 +395,11 @@ fun LoginScreen(
                         )
                     }
 
-                    // Biometric
+                    // Phone OTP Login
                     OutlinedButton(
-                        onClick = { /* BiometricPrompt integration */ },
+                        onClick = {
+                            navController.navigate("phone_login")
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .height(52.dp),
@@ -368,14 +411,14 @@ fun LoginScreen(
                         ),
                     ) {
                         Icon(
-                            Icons.Outlined.Fingerprint,
+                            Icons.Default.Phone,
                             contentDescription = null,
                             tint = BloodRed,
                             modifier = Modifier.size(22.dp),
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "Biometric",
+                            "Phone",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onBackground,
                         )

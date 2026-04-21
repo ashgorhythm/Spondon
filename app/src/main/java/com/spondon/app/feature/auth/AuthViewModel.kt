@@ -9,10 +9,25 @@ import com.spondon.app.core.data.repository.AuthRepository
 import com.spondon.app.core.data.repository.UserRepository
 import com.spondon.app.core.domain.model.User
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.Date
 import javax.inject.Inject
+
+/**
+ * One-shot navigation events emitted by the ViewModel.
+ * Using a Channel ensures each event is consumed exactly once,
+ * preventing the crash-on-reopen bug caused by stale state flags
+ * re-triggering navigation after the auth_flow graph is destroyed.
+ */
+sealed class AuthNavigationEvent {
+    data object NavigateToHome : AuthNavigationEvent()
+    data object NavigateToProfileSetup : AuthNavigationEvent()
+    data object NavigateToLogin : AuthNavigationEvent()
+    data object NavigateToOnboarding : AuthNavigationEvent()
+    data object PasswordResetSuccess : AuthNavigationEvent()
+}
 
 data class AuthState(
     // ── Sign Up Step 1: Basic Info ───
@@ -47,6 +62,7 @@ data class AuthState(
     val verificationId: String = "",
     val otpTimerSeconds: Int = 60,
     val otpPhone: String = "",
+    val otpSent: Boolean = false,
 
     // ── Forgot Password ───
     val forgotPasswordStep: Int = 0,
@@ -54,6 +70,9 @@ data class AuthState(
     val newPassword: String = "",
     val confirmNewPassword: String = "",
     val newPasswordVisible: Boolean = false,
+
+    // ── Phone Login ───
+    val phoneLoginNumber: String = "",
 
     // ── General State ───
     val isLoading: Boolean = false,
@@ -64,6 +83,10 @@ data class AuthState(
     val isOnboardingComplete: Boolean = false,
     val isLoggedIn: Boolean = false,
     val needsProfileSetup: Boolean = false,
+    val isInitialized: Boolean = false,
+
+    // ── Splash navigation decision (consumed once) ───
+    val splashDestination: String? = null,
 )
 
 @HiltViewModel
@@ -76,33 +99,119 @@ class AuthViewModel @Inject constructor(
     private val _state = MutableStateFlow(AuthState())
     val state: StateFlow<AuthState> = _state.asStateFlow()
 
+    /**
+     * One-shot navigation events via Channel.
+     * Each event is consumed exactly once — this prevents the reopen crash
+     * caused by stale boolean flags (isLoginComplete, needsProfileSetup)
+     * re-firing LaunchedEffects after the nav graph is rebuilt.
+     */
+    private val _navigationEvent = Channel<AuthNavigationEvent>(Channel.BUFFERED)
+    val navigationEvent: Flow<AuthNavigationEvent> = _navigationEvent.receiveAsFlow()
+
     init {
         checkInitialState()
     }
 
-    private fun checkInitialState() {
+    private fun fetchUserDataAndCompleteLogin() {
         viewModelScope.launch {
-            val isOnboarded = preferencesManager.isOnboardingComplete.first()
-            val isLoggedIn = authRepository.isLoggedIn()
-            // If user has blood group set, profile setup is complete
-            var needsSetup = false
-            if (isLoggedIn) {
+            try {
                 val uid = authRepository.getCurrentUserId()
                 if (uid != null) {
                     when (val result = userRepository.getUser(uid)) {
                         is Resource.Success -> {
-                            needsSetup = result.data.bloodGroup.isEmpty()
+                            val userData = result.data
+                            val needsSetup = userData.bloodGroup.isEmpty()
+                            _state.update {
+                                it.copy(
+                                    fullName = userData.name,
+                                    email = userData.email,
+                                    phone = userData.phone,
+                                    selectedBloodGroup = userData.bloodGroup,
+                                    dateOfBirth = userData.dob?.time,
+                                    weight = if (userData.weight > 0) userData.weight.toString() else "",
+                                    selectedDistrict = userData.district,
+                                    selectedUpazila = userData.upazila,
+                                    wantsToBeDonor = userData.isDonor,
+                                    isLoading = false,
+                                    isLoginComplete = !needsSetup,
+                                    isLoggedIn = true,
+                                    needsProfileSetup = needsSetup,
+                                )
+                            }
+                            // Emit one-shot navigation event
+                            if (needsSetup) {
+                                _navigationEvent.send(AuthNavigationEvent.NavigateToProfileSetup)
+                            } else {
+                                _navigationEvent.send(AuthNavigationEvent.NavigateToHome)
+                            }
                         }
-                        else -> {}
+                        is Resource.Error -> {
+                            _state.update { it.copy(isLoading = false, error = result.message) }
+                        }
+                        else -> {
+                            // Firestore has no data but user is authenticated — needs profile setup
+                            _state.update {
+                                it.copy(
+                                    isLoading = false,
+                                    isLoggedIn = true,
+                                    needsProfileSetup = true,
+                                )
+                            }
+                            _navigationEvent.send(AuthNavigationEvent.NavigateToProfileSetup)
+                        }
+                    }
+                } else {
+                    _state.update { it.copy(isLoading = false, error = "Authentication failed") }
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(isLoading = false, error = e.message) }
+            }
+        }
+    }
+
+    private fun checkInitialState() {
+        viewModelScope.launch {
+            try {
+                val isOnboarded = preferencesManager.isOnboardingComplete.first()
+                val isLoggedIn = authRepository.isLoggedIn()
+                var needsSetup = false
+                var userData: User? = null
+
+                if (isLoggedIn) {
+                    val uid = authRepository.getCurrentUserId()
+                    if (uid != null) {
+                        when (val result = userRepository.getUser(uid)) {
+                            is Resource.Success -> {
+                                userData = result.data
+                                needsSetup = userData.bloodGroup.isEmpty()
+                            }
+                            else -> {
+                                // User exists in Firebase Auth but not in Firestore — needs setup
+                                needsSetup = true
+                            }
+                        }
                     }
                 }
-            }
-            _state.update {
-                it.copy(
-                    isOnboardingComplete = isOnboarded,
-                    isLoggedIn = isLoggedIn,
-                    needsProfileSetup = needsSetup,
-                )
+
+                _state.update {
+                    it.copy(
+                        fullName = userData?.name ?: it.fullName,
+                        email = userData?.email ?: it.email,
+                        phone = userData?.phone ?: it.phone,
+                        selectedBloodGroup = userData?.bloodGroup ?: it.selectedBloodGroup,
+                        dateOfBirth = userData?.dob?.time ?: it.dateOfBirth,
+                        weight = if (userData?.weight != null && userData.weight > 0) userData.weight.toString() else it.weight,
+                        selectedDistrict = userData?.district ?: it.selectedDistrict,
+                        selectedUpazila = userData?.upazila ?: it.selectedUpazila,
+                        wantsToBeDonor = userData?.isDonor ?: it.wantsToBeDonor,
+                        isOnboardingComplete = isOnboarded,
+                        isLoggedIn = isLoggedIn,
+                        needsProfileSetup = needsSetup,
+                        isInitialized = true,
+                    )
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(isInitialized = true, error = e.message) }
             }
         }
     }
@@ -196,14 +305,32 @@ class AuthViewModel @Inject constructor(
                 district = s.selectedDistrict,
                 upazila = s.selectedUpazila,
             )
-            when (val result = authRepository.signUpWithEmail(s.email, s.password, user)) {
-                is Resource.Success -> {
-                    _state.update { it.copy(isLoading = false, isSignUpComplete = true) }
+
+            // If user is already logged in (Google sign-in flow), update profile instead
+            val existingUid = authRepository.getCurrentUserId()
+            if (existingUid != null && s.isLoggedIn) {
+                val updatedUser = user.copy(uid = existingUid)
+                when (val result = userRepository.updateUser(updatedUser)) {
+                    is Resource.Success -> {
+                        _state.update { it.copy(isLoading = false, isSignUpComplete = true, isLoggedIn = true, needsProfileSetup = false) }
+                        _navigationEvent.send(AuthNavigationEvent.NavigateToHome)
+                    }
+                    is Resource.Error -> {
+                        _state.update { it.copy(isLoading = false, error = result.message) }
+                    }
+                    is Resource.Loading -> {}
                 }
-                is Resource.Error -> {
-                    _state.update { it.copy(isLoading = false, error = result.message) }
+            } else {
+                when (val result = authRepository.signUpWithEmail(s.email, s.password, user)) {
+                    is Resource.Success -> {
+                        _state.update { it.copy(isLoading = false, isSignUpComplete = true, isLoggedIn = true) }
+                        _navigationEvent.send(AuthNavigationEvent.NavigateToHome)
+                    }
+                    is Resource.Error -> {
+                        _state.update { it.copy(isLoading = false, error = result.message) }
+                    }
+                    is Resource.Loading -> {}
                 }
-                is Resource.Loading -> {}
             }
         }
     }
@@ -225,7 +352,7 @@ class AuthViewModel @Inject constructor(
                         preferencesManager.setRememberMe(true)
                         preferencesManager.setSavedEmail(s.loginEmail)
                     }
-                    _state.update { it.copy(isLoading = false, isLoginComplete = true) }
+                    fetchUserDataAndCompleteLogin()
                 }
                 is Resource.Error -> {
                     _state.update { it.copy(isLoading = false, error = result.message) }
@@ -240,14 +367,7 @@ class AuthViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true, error = null) }
             when (val result = authRepository.signInWithGoogle(idToken)) {
                 is Resource.Success -> {
-                    val needsSetup = result.data.bloodGroup.isEmpty()
-                    _state.update {
-                        it.copy(
-                            isLoading = false,
-                            isLoginComplete = !needsSetup,
-                            needsProfileSetup = needsSetup,
-                        )
-                    }
+                    fetchUserDataAndCompleteLogin()
                 }
                 is Resource.Error -> {
                     _state.update { it.copy(isLoading = false, error = result.message) }
@@ -265,9 +385,14 @@ class AuthViewModel @Inject constructor(
         _state.update { it.copy(otpDigits = digits, error = null) }
     }
 
-    fun setVerificationId(id: String) = _state.update { it.copy(verificationId = id) }
+    fun setVerificationId(id: String) = _state.update { it.copy(verificationId = id, otpSent = true) }
     fun setOtpPhone(phone: String) = _state.update { it.copy(otpPhone = phone) }
     fun updateOtpTimer(seconds: Int) = _state.update { it.copy(otpTimerSeconds = seconds) }
+
+    fun updatePhoneLoginNumber(phone: String) = _state.update { it.copy(phoneLoginNumber = phone, error = null) }
+
+    /** Clear OTP digits (used when resending or on error) */
+    fun clearOtpDigits() = _state.update { it.copy(otpDigits = List(6) { "" }, error = null) }
 
     fun verifyOtp() {
         viewModelScope.launch {
@@ -279,7 +404,7 @@ class AuthViewModel @Inject constructor(
             }
             when (val result = authRepository.verifyOtp(_state.value.verificationId, code)) {
                 is Resource.Success -> {
-                    _state.update { it.copy(isLoading = false, isLoginComplete = true) }
+                    fetchUserDataAndCompleteLogin()
                 }
                 is Resource.Error -> {
                     _state.update { it.copy(isLoading = false, error = result.message) }
@@ -302,6 +427,7 @@ class AuthViewModel @Inject constructor(
             when (val result = authRepository.resetPassword(_state.value.resetEmail)) {
                 is Resource.Success -> {
                     _state.update { it.copy(isLoading = false, isPasswordResetSuccess = true) }
+                    _navigationEvent.send(AuthNavigationEvent.PasswordResetSuccess)
                 }
                 is Resource.Error -> {
                     _state.update { it.copy(isLoading = false, error = result.message) }
@@ -313,9 +439,46 @@ class AuthViewModel @Inject constructor(
 
     fun advanceForgotPasswordStep() = _state.update { it.copy(forgotPasswordStep = it.forgotPasswordStep + 1) }
 
+    /** Reset forgot password state when leaving the screen */
+    fun resetForgotPasswordState() = _state.update {
+        it.copy(
+            resetEmail = "",
+            newPassword = "",
+            confirmNewPassword = "",
+            newPasswordVisible = false,
+            forgotPasswordStep = 0,
+            isPasswordResetSuccess = false,
+        )
+    }
+
+    // ─── Sign Out ────────────────────────────────────────────
+
+    fun signOut() {
+        viewModelScope.launch {
+            authRepository.signOut()
+            preferencesManager.setRememberMe(false)
+            preferencesManager.setSavedEmail("")
+            _state.update { AuthState(isOnboardingComplete = true, isInitialized = true) }
+            _navigationEvent.send(AuthNavigationEvent.NavigateToLogin)
+        }
+    }
+
     // ─── Utility ─────────────────────────────────────────────
 
     fun clearError() = _state.update { it.copy(error = null) }
+
+    /**
+     * Resets transient auth state flags to prevent stale navigation.
+     * Should be called when a screen is entered.
+     */
+    fun resetAuthFlags() = _state.update {
+        it.copy(
+            isLoginComplete = false,
+            isSignUpComplete = false,
+            needsProfileSetup = false,
+            isPasswordResetSuccess = false,
+        )
+    }
 
     // ─── Activity-bridge helpers ─────────────────────────────
 
@@ -340,7 +503,7 @@ class AuthViewModel @Inject constructor(
             try {
                 // Delegate to the repository's verifyOtp by reusing the credential directly
                 when (val result = authRepository.signInWithPhoneCredential(credential)) {
-                    is Resource.Success -> _state.update { it.copy(isLoading = false, isLoginComplete = true) }
+                    is Resource.Success -> fetchUserDataAndCompleteLogin()
                     is Resource.Error   -> _state.update { it.copy(isLoading = false, error = result.message) }
                     is Resource.Loading -> {}
                 }

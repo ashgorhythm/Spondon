@@ -88,12 +88,25 @@ fun OtpScreen(
         }
     }
 
-    LaunchedEffect(state.isLoginComplete) {
-        if (state.isLoginComplete) {
-            overlayState = AuthOverlayState.SUCCESS
-            delay(1200)
-            navController.navigate(Routes.Home.route) {
-                popUpTo(Routes.Splash.route) { inclusive = true }
+    // ── One-shot navigation events ──
+    LaunchedEffect(Unit) {
+        viewModel.navigationEvent.collect { event ->
+            when (event) {
+                is AuthNavigationEvent.NavigateToHome -> {
+                    overlayState = AuthOverlayState.SUCCESS
+                    delay(1200)
+                    navController.navigate(Routes.Home.route) {
+                        popUpTo(Routes.Splash.route) { inclusive = true }
+                    }
+                }
+                is AuthNavigationEvent.NavigateToProfileSetup -> {
+                    overlayState = AuthOverlayState.SUCCESS
+                    delay(800)
+                    navController.navigate(Routes.DonorProfileSetup.route) {
+                        popUpTo(Routes.Splash.route) { inclusive = true }
+                    }
+                }
+                else -> {}
             }
         }
     }
@@ -259,6 +272,7 @@ fun OtpScreen(
                     onClick = {
                         timerSeconds = 60
                         timerActive = true
+                        viewModel.clearOtpDigits()
                         if (state.otpPhone.isNotBlank()) {
                             onSendOtp(state.otpPhone)
                         }

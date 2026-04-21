@@ -50,6 +50,7 @@ fun SpondonNavGraph(
                 LoginScreen(
                     navController = navController,
                     onGoogleSignIn = onGoogleSignIn,
+                    onSendOtp = onSendOtp,
                     viewModel = sharedViewModel,
                 )
             }
@@ -72,9 +73,23 @@ fun SpondonNavGraph(
                 val sharedViewModel: AuthViewModel = hiltViewModel(parentEntry)
                 LocationSetupScreen(navController, sharedViewModel)
             }
+            composable(Routes.PhoneLogin.route) { entry ->
+                val parentEntry = navController.getBackStackEntry("auth_flow")
+                val sharedViewModel: AuthViewModel = hiltViewModel(parentEntry)
+                PhoneLoginScreen(
+                    navController = navController,
+                    onSendOtp = onSendOtp,
+                    viewModel = sharedViewModel,
+                )
+            }
             composable(Routes.Otp.route) { entry ->
                 val parentEntry = navController.getBackStackEntry("auth_flow")
                 val sharedViewModel: AuthViewModel = hiltViewModel(parentEntry)
+                // Extract phone from route argument
+                val phone = entry.arguments?.getString("phone") ?: ""
+                if (phone.isNotEmpty()) {
+                    sharedViewModel.setOtpPhone(phone)
+                }
                 OtpScreen(
                     navController = navController,
                     onSendOtp = onSendOtp,

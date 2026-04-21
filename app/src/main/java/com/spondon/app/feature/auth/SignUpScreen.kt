@@ -79,24 +79,25 @@ fun SignUpScreen(
         }
     }
 
-    // Track sign-up success (Google sign-in with missing profile)
-    LaunchedEffect(state.needsProfileSetup) {
-        if (state.needsProfileSetup) {
-            overlayState = AuthOverlayState.SUCCESS
-            delay(800)
-            navController.navigate(Routes.DonorProfileSetup.route) {
-                popUpTo(Routes.SignUp.route) { inclusive = true }
-            }
-        }
-    }
-
-    // Track Google sign-in success (full profile exists)
-    LaunchedEffect(state.isLoginComplete) {
-        if (state.isLoginComplete) {
-            overlayState = AuthOverlayState.SUCCESS
-            delay(1000)
-            navController.navigate(Routes.Home.route) {
-                popUpTo(Routes.SignUp.route) { inclusive = true }
+    // ── One-shot navigation events (prevents crash-on-reopen) ──
+    LaunchedEffect(Unit) {
+        viewModel.navigationEvent.collect { event ->
+            when (event) {
+                is AuthNavigationEvent.NavigateToProfileSetup -> {
+                    overlayState = AuthOverlayState.SUCCESS
+                    delay(800)
+                    navController.navigate(Routes.DonorProfileSetup.route) {
+                        popUpTo(Routes.SignUp.route) { inclusive = true }
+                    }
+                }
+                is AuthNavigationEvent.NavigateToHome -> {
+                    overlayState = AuthOverlayState.SUCCESS
+                    delay(1000)
+                    navController.navigate(Routes.Home.route) {
+                        popUpTo(Routes.SignUp.route) { inclusive = true }
+                    }
+                }
+                else -> {} // Other events handled by other screens
             }
         }
     }

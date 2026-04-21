@@ -1,6 +1,7 @@
 package com.spondon.app.feature.auth
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -18,8 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,6 +37,11 @@ fun ForgotPasswordScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val scrollState = rememberScrollState()
+
+    // Reset state when leaving
+    DisposableEffect(Unit) {
+        onDispose { viewModel.resetForgotPasswordState() }
+    }
 
     Column(
         modifier = Modifier
@@ -97,10 +101,14 @@ fun ForgotPasswordScreen(
                 } else {
                     // Success screen
                     ForgotPasswordSuccess(
+                        email = state.resetEmail,
                         onBackToLogin = {
                             navController.navigate(Routes.Login.route) {
                                 popUpTo(Routes.ForgotPassword.route) { inclusive = true }
                             }
+                        },
+                        onResendEmail = {
+                            viewModel.sendPasswordResetEmail()
                         },
                     )
                 }
@@ -170,12 +178,40 @@ private fun ForgotPasswordEmailStep(
             onClick = onSendReset,
             enabled = email.contains("@") && !isLoading,
         )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Tips card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            ),
+            shape = MaterialTheme.shapes.medium,
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "💡 Tips",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "• Use the email you registered with\n• Check your spam folder if you don't see it\n• Link expires in 1 hour",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    lineHeight = 20.sp,
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun ForgotPasswordSuccess(
+    email: String,
     onBackToLogin: () -> Unit,
+    onResendEmail: () -> Unit,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -213,7 +249,48 @@ private fun ForgotPasswordSuccess(
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "We've sent a password reset link to your email address. Please check your inbox and follow the instructions.",
+            text = "We've sent a password reset link to:",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+            textAlign = TextAlign.Center,
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Email highlight
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = BloodRed.copy(alpha = 0.08f),
+            ),
+            shape = MaterialTheme.shapes.small,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.Email,
+                    contentDescription = null,
+                    tint = BloodRed,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = email,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = BloodRed,
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = "Please check your inbox and follow the instructions to reset your password.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             textAlign = TextAlign.Center,
@@ -226,5 +303,16 @@ private fun ForgotPasswordSuccess(
             text = "Back to Login",
             onClick = onBackToLogin,
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Resend button
+        TextButton(onClick = onResendEmail) {
+            Text(
+                text = "Didn't receive it? Resend",
+                color = SoftRose,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            )
+        }
     }
 }
