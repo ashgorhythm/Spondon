@@ -101,7 +101,7 @@ fun LocationSetupScreen(
             when (event) {
                 is AuthNavigationEvent.NavigateToHome -> {
                     navController.navigate(Routes.Home.route) {
-                        popUpTo(Routes.Splash.route) { inclusive = true }
+                        popUpTo("auth_flow") { inclusive = true }
                     }
                 }
                 else -> {}

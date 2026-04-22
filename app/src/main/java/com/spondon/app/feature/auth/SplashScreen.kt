@@ -18,7 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -41,29 +43,51 @@ fun SplashScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
+    // Local guard: ensures we only navigate ONCE per SplashScreen composition.
+    // This prevents re-navigation when the ViewModel's isInitialized is already
+    // true from a prior session (e.g. process-kept Activity ViewModel).
+    var hasNavigated by remember { mutableStateOf(false) }
+
     // Entrance animation values
     val logoAlpha = remember { Animatable(0f) }
     val nameAlpha = remember { Animatable(0f) }
     val taglineAlpha = remember { Animatable(0f) }
     val logoScale = remember { Animatable(0.6f) }
 
-    LaunchedEffect(state.isInitialized) {
-        if (state.isInitialized) {
-            // Animate in sequence
-            logoAlpha.animateTo(1f, animationSpec = tween(600))
-            logoScale.animateTo(1f, animationSpec = tween(500, easing = EaseOutBack))
-            nameAlpha.animateTo(1f, animationSpec = tween(500))
-            taglineAlpha.animateTo(1f, animationSpec = tween(500))
-            delay(800)
+    // Use LaunchedEffect(Unit) so it runs exactly once per composition.
+    // Inside, we wait until isInitialized is true, then navigate.
+    LaunchedEffect(Unit) {
+        // Animate logo regardless of init state
+        logoAlpha.animateTo(1f, animationSpec = tween(600))
+        logoScale.animateTo(1f, animationSpec = tween(500, easing = EaseOutBack))
+        nameAlpha.animateTo(1f, animationSpec = tween(500))
+        taglineAlpha.animateTo(1f, animationSpec = tween(500))
+        delay(600)
 
-            // Auth-based navigation — determine destination and navigate once.
-            // This runs only once because isInitialized transitions from false→true once.
-            val destination = when {
-                !state.isOnboardingComplete -> Routes.Onboarding.route
-                state.isLoggedIn && !state.needsProfileSetup -> Routes.Home.route
-                state.isLoggedIn && state.needsProfileSetup -> Routes.DonorProfileSetup.route
-                else -> Routes.Login.route
+        // Poll until ViewModel has finished checking auth + Firestore.
+        // If it was already initialized (ViewModel survived), this is instant.
+        while (!viewModel.state.value.isInitialized) {
+            delay(100)
+        }
+
+        if (hasNavigated) return@LaunchedEffect
+        hasNavigated = true
+
+        val currentState = viewModel.state.value
+        val destination = when {
+            !currentState.isOnboardingComplete -> Routes.Onboarding.route
+            currentState.isLoggedIn && !currentState.needsProfileSetup -> Routes.Home.route
+            currentState.isLoggedIn && currentState.needsProfileSetup -> Routes.DonorProfileSetup.route
+            else -> Routes.Login.route
+        }
+
+        // Home is OUTSIDE auth_flow → pop the entire auth graph.
+        // All other destinations are INSIDE auth_flow → just pop the splash screen.
+        if (destination == Routes.Home.route) {
+            navController.navigate(destination) {
+                popUpTo("auth_flow") { inclusive = true }
             }
+        } else {
             navController.navigate(destination) {
                 popUpTo(Routes.Splash.route) { inclusive = true }
             }

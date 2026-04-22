@@ -44,9 +44,11 @@ fun PhoneLoginScreen(
         formAlpha.animateTo(1f, tween(450))
     }
 
-    // When OTP is sent, navigate to OTP screen
-    LaunchedEffect(state.otpSent) {
-        if (state.otpSent && state.verificationId.isNotEmpty()) {
+    // When OTP is sent, navigate to OTP screen (once only)
+    var hasNavigatedToOtp by remember { mutableStateOf(false) }
+    LaunchedEffect(state.otpSent, state.verificationId) {
+        if (state.otpSent && state.verificationId.isNotEmpty() && !hasNavigatedToOtp) {
+            hasNavigatedToOtp = true
             val phone = state.otpPhone.ifEmpty { state.phoneLoginNumber }
             val encodedPhone = URLEncoder.encode(phone, "UTF-8")
             navController.navigate("otp/$encodedPhone")

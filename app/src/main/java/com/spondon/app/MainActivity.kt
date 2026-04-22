@@ -52,6 +52,7 @@ class MainActivity : ComponentActivity() {
             SpondonTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     SpondonNavGraph(
+                        authViewModel  = authViewModel,
                         onGoogleSignIn = { launchGoogleSignIn() },
                         onSendOtp      = { phone -> sendOtp(phone) },
                     )

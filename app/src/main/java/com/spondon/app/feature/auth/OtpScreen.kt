@@ -96,14 +96,15 @@ fun OtpScreen(
                     overlayState = AuthOverlayState.SUCCESS
                     delay(1200)
                     navController.navigate(Routes.Home.route) {
-                        popUpTo(Routes.Splash.route) { inclusive = true }
+                        popUpTo("auth_flow") { inclusive = true }
                     }
                 }
                 is AuthNavigationEvent.NavigateToProfileSetup -> {
                     overlayState = AuthOverlayState.SUCCESS
                     delay(800)
                     navController.navigate(Routes.DonorProfileSetup.route) {
-                        popUpTo(Routes.Splash.route) { inclusive = true }
+                        // DonorProfileSetup is INSIDE auth_flow, so just pop current screen
+                        popUpTo(Routes.Otp.route) { inclusive = true }
                     }
                 }
                 else -> {}

@@ -87,6 +87,7 @@ fun SignUpScreen(
                     overlayState = AuthOverlayState.SUCCESS
                     delay(800)
                     navController.navigate(Routes.DonorProfileSetup.route) {
+                        // DonorProfileSetup is INSIDE auth_flow, so just pop current screen
                         popUpTo(Routes.SignUp.route) { inclusive = true }
                     }
                 }
@@ -94,7 +95,7 @@ fun SignUpScreen(
                     overlayState = AuthOverlayState.SUCCESS
                     delay(1000)
                     navController.navigate(Routes.Home.route) {
-                        popUpTo(Routes.SignUp.route) { inclusive = true }
+                        popUpTo("auth_flow") { inclusive = true }
                     }
                 }
                 else -> {} // Other events handled by other screens
