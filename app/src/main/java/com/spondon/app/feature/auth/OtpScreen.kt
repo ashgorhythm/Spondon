@@ -56,7 +56,7 @@ fun OtpScreen(
     LaunchedEffect(Unit) {
         headerAlpha.animateTo(1f, tween(400))
         boxesAlpha.animateTo(1f, tween(400))
-        boxesScale.animateTo(1f, tween(400, easing = EaseOutBack))
+        boxesScale.animateTo(1f, tween(400, easing = EaseOutCubic))
     }
 
     // ── Timer ──

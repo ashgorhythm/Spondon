@@ -1,6 +1,8 @@
 package com.spondon.app.feature.auth
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -203,8 +205,8 @@ fun LocationSetupScreen(
             // Upazila Picker — guarded with stable visibility flag
             AnimatedVisibility(
                 visible = showUpazila,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
+                enter = fadeIn(tween(200, easing = LinearEasing)) + expandVertically(animationSpec = tween(200, easing = LinearEasing)),
+                exit = fadeOut(tween(150, easing = LinearEasing)) + shrinkVertically(animationSpec = tween(150, easing = LinearEasing)),
             ) {
                 Column {
                     Text(

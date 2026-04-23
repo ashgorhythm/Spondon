@@ -1,7 +1,7 @@
 package com.spondon.app.feature.auth
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.EaseOutBack
+import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -59,7 +59,7 @@ fun SplashScreen(
     LaunchedEffect(Unit) {
         // Animate logo regardless of init state
         logoAlpha.animateTo(1f, animationSpec = tween(600))
-        logoScale.animateTo(1f, animationSpec = tween(500, easing = EaseOutBack))
+        logoScale.animateTo(1f, animationSpec = tween(500, easing = EaseOutCubic))
         nameAlpha.animateTo(1f, animationSpec = tween(500))
         taglineAlpha.animateTo(1f, animationSpec = tween(500))
         delay(600)

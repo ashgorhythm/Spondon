@@ -2,8 +2,8 @@ package com.spondon.app.feature.auth
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.EaseOutBack
 import androidx.compose.animation.core.EaseOutCubic
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -97,7 +97,7 @@ fun LoginScreen(
 
     LaunchedEffect(Unit) {
         logoAlpha.animateTo(1f, tween(500))
-        logoScale.animateTo(1f, tween(400, easing = EaseOutBack))
+        logoScale.animateTo(1f, tween(400, easing = EaseOutCubic))
         formAlpha.animateTo(1f, tween(400))
         formOffset.animateTo(0f, tween(400, easing = EaseOutCubic))
         socialAlpha.animateTo(1f, tween(350))
@@ -292,8 +292,8 @@ fun LoginScreen(
                 // Inline error (shown below the form, NOT the overlay)
                 AnimatedVisibility(
                     visible = state.error != null && overlayState == AuthOverlayState.HIDDEN,
-                    enter = slideInVertically(initialOffsetY = { -20 }) + fadeIn(),
-                    exit = slideOutVertically(targetOffsetY = { -20 }) + fadeOut(),
+                    enter = slideInVertically(animationSpec = tween(200, easing = LinearEasing), initialOffsetY = { -20 }) + fadeIn(tween(200, easing = LinearEasing)),
+                    exit = slideOutVertically(animationSpec = tween(150, easing = LinearEasing), targetOffsetY = { -20 }) + fadeOut(tween(150, easing = LinearEasing)),
                 ) {
                     Card(
                         colors = CardDefaults.cardColors(

@@ -17,3 +17,9 @@ enum class CommunityType { PUBLIC, PRIVATE }
 enum class CommunityRole { ADMIN, MODERATOR, MEMBER }
 enum class DonationStatus { CONFIRMED, PENDING }
 enum class NotificationType { REQUEST, JOIN, DONATION, ADMIN, REMINDER }
+
+/** Platform-wide role. SUPER_ADMIN has unrestricted access. */
+enum class UserRole { SUPER_ADMIN, USER }
+
+/** Tracks a user's relationship to a community. */
+enum class MembershipStatus { JOINED, PENDING, NONE }

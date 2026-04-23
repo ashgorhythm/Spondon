@@ -1,10 +1,20 @@
 package com.spondon.app.navigation
 
-import androidx.compose.runtime.Composable
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.spondon.app.core.ui.components.SpondonBottomNav
+import com.spondon.app.core.ui.components.bottomNavItems
 import com.spondon.app.feature.auth.*
 import com.spondon.app.feature.community.*
 import com.spondon.app.feature.donor.*
@@ -13,19 +23,12 @@ import com.spondon.app.feature.profile.*
 import com.spondon.app.feature.request.*
 import com.spondon.app.feature.settings.SettingsScreen
 
-/**
- * Root navigation graph for Spondon.
- *
- * **Critical design decision:** [authViewModel] is the single Activity-scoped
- * AuthViewModel instance created in MainActivity via `by viewModels()`.
- * It is passed in here so that every auth screen, as well as the
- * Activity-level Google Sign-In and OTP callbacks, all share the SAME instance.
- *
- * Previous bug: Using `hiltViewModel(parentEntry)` inside the nav graph created
- * a second ViewModel scoped to the "auth_flow" back-stack entry. Callbacks from
- * MainActivity updated the Activity's instance while Compose screens observed
- * the nav-graph's instance → events were lost, navigation never fired.
- */
+private val safeEnter: EnterTransition =
+    fadeIn(animationSpec = tween(300, easing = LinearEasing))
+
+private val safeExit: ExitTransition =
+    fadeOut(animationSpec = tween(250, easing = LinearEasing))
+
 @Composable
 fun SpondonNavGraph(
     authViewModel: AuthViewModel,
@@ -33,95 +36,156 @@ fun SpondonNavGraph(
     onSendOtp: (String) -> Unit = {},
 ) {
     val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
 
-    NavHost(
-        navController = navController,
-        startDestination = "auth_flow"
-    ) {
-        // ─── Auth Flow (nested graph) ─────────────────────────────
-        // All screens share the single [authViewModel] passed from MainActivity.
-        navigation(
-            startDestination = Routes.Splash.route,
-            route = "auth_flow",
+    val bottomNavRoutes = bottomNavItems.map { it.route }.toSet()
+    val showBottomBar = currentRoute in bottomNavRoutes
+
+    Scaffold(
+        bottomBar = {
+            if (showBottomBar) {
+                SpondonBottomNav(
+                    currentRoute = currentRoute ?: "",
+                    onNavigate = { route ->
+                        navController.navigate(route) {
+                            popUpTo(Routes.Home.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
+            }
+        },
+    ) { padding ->
+        NavHost(
+            navController = navController,
+            startDestination = "auth_flow",
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            enterTransition = { safeEnter },
+            exitTransition = { safeExit },
+            popEnterTransition = { safeEnter },
+            popExitTransition = { safeExit },
         ) {
-            composable(Routes.Splash.route) {
-                SplashScreen(navController, authViewModel)
-            }
-            composable(Routes.Onboarding.route) {
-                OnboardingScreen(navController, authViewModel)
-            }
-            composable(Routes.Login.route) {
-                LoginScreen(
-                    navController = navController,
-                    onGoogleSignIn = onGoogleSignIn,
-                    onSendOtp = onSendOtp,
-                    viewModel = authViewModel,
-                )
-            }
-            composable(Routes.SignUp.route) {
-                SignUpScreen(
-                    navController = navController,
-                    onGoogleSignIn = onGoogleSignIn,
-                    viewModel = authViewModel,
-                )
-            }
-            composable(Routes.DonorProfileSetup.route) {
-                DonorProfileSetupScreen(navController, authViewModel)
-            }
-            composable(Routes.LocationSetup.route) {
-                LocationSetupScreen(navController, authViewModel)
-            }
-            composable(Routes.PhoneLogin.route) {
-                PhoneLoginScreen(
-                    navController = navController,
-                    onSendOtp = onSendOtp,
-                    viewModel = authViewModel,
-                )
-            }
-            composable(Routes.Otp.route) { entry ->
-                // Extract phone from route argument
-                val phone = entry.arguments?.getString("phone") ?: ""
-                if (phone.isNotEmpty()) {
-                    authViewModel.setOtpPhone(phone)
+            // ─── Auth Flow (nested graph) ────────────────────
+            navigation(
+                startDestination = Routes.Splash.route,
+                route = "auth_flow",
+                enterTransition = { safeEnter },
+                exitTransition = { safeExit },
+                popEnterTransition = { safeEnter },
+                popExitTransition = { safeExit },
+            ) {
+                composable(Routes.Splash.route) {
+                    SplashScreen(navController, authViewModel)
                 }
-                OtpScreen(
-                    navController = navController,
-                    onSendOtp = onSendOtp,
-                    viewModel = authViewModel,
-                )
+                composable(Routes.Onboarding.route) {
+                    OnboardingScreen(navController, authViewModel)
+                }
+                composable(Routes.Login.route) {
+                    LoginScreen(
+                        navController = navController,
+                        onGoogleSignIn = onGoogleSignIn,
+                        onSendOtp = onSendOtp,
+                        viewModel = authViewModel,
+                    )
+                }
+                composable(Routes.SignUp.route) {
+                    SignUpScreen(
+                        navController = navController,
+                        onGoogleSignIn = onGoogleSignIn,
+                        viewModel = authViewModel,
+                    )
+                }
+                composable(Routes.DonorProfileSetup.route) {
+                    DonorProfileSetupScreen(navController, authViewModel)
+                }
+                composable(Routes.LocationSetup.route) {
+                    LocationSetupScreen(navController, authViewModel)
+                }
+                composable(Routes.PhoneLogin.route) {
+                    PhoneLoginScreen(
+                        navController = navController,
+                        onSendOtp = onSendOtp,
+                        viewModel = authViewModel,
+                    )
+                }
+                composable(Routes.Otp.route) { entry ->
+                    val phone = entry.arguments?.getString("phone") ?: ""
+                    if (phone.isNotEmpty()) {
+                        authViewModel.setOtpPhone(phone)
+                    }
+                    OtpScreen(
+                        navController = navController,
+                        onSendOtp = onSendOtp,
+                        viewModel = authViewModel,
+                    )
+                }
+                composable(Routes.ForgotPassword.route) {
+                    ForgotPasswordScreen(navController, authViewModel)
+                }
             }
-            composable(Routes.ForgotPassword.route) {
-                ForgotPasswordScreen(navController, authViewModel)
+
+            // ─── Main (Bottom Nav Destinations) ──────────────
+            composable(Routes.Home.route) { HomeScreen(navController) }
+            composable(Routes.CommunityList.route) { CommunityListScreen(navController) }
+            composable(Routes.CreateRequest.route) { CreateRequestScreen(navController) }
+            composable(Routes.FindDonor.route) { FindDonorScreen(navController) }
+            composable(Routes.Profile.route) { ProfileScreen(navController) }
+
+            // ─── Community Sub-screens ────────────────────────
+            composable(
+                route = Routes.CommunityDetail.route,
+                arguments = listOf(navArgument("communityId") { type = NavType.StringType }),
+            ) {
+                CommunityDetailScreen(navController)
             }
+
+            composable(Routes.CreateCommunity.route) {
+                CreateCommunityScreen(navController)
+            }
+
+            composable(
+                route = Routes.JoinRequest.route,
+                arguments = listOf(navArgument("communityId") { type = NavType.StringType }),
+            ) {
+                JoinRequestScreen(navController)
+            }
+
+            composable(
+                route = Routes.AdminDashboard.route,
+                arguments = listOf(navArgument("communityId") { type = NavType.StringType }),
+            ) {
+                AdminDashboardScreen(navController)
+            }
+
+            // ─── Blood Request Sub-screens ───────────────────
+            composable(
+                route = Routes.RequestDetail.route,
+                arguments = listOf(navArgument("requestId") { type = NavType.StringType }),
+            ) {
+                RequestDetailScreen(navController)
+            }
+            composable(Routes.RequestFeed.route) { RequestFeedScreen(navController) }
+
+            // ─── Donor Sub-screens ───────────────────────────
+            composable(
+                route = Routes.DonorProfile.route,
+                arguments = listOf(navArgument("userId") { type = NavType.StringType }),
+            ) {
+                DonorProfileScreen(navController)
+            }
+            composable(Routes.DonationHistory.route) { DonationHistoryScreen(navController) }
+            composable(Routes.Achievements.route) { AchievementsScreen(navController) }
+
+            // ─── Profile Sub-screens ─────────────────────────
+            composable(Routes.EditProfile.route) { EditProfileScreen(navController) }
+
+            // ─── Settings & Notifications ────────────────────
+            composable(Routes.Settings.route) { SettingsScreen(navController) }
+            composable(Routes.Notifications.route) { NotificationScreen(navController) }
         }
-
-        // ─── Main ────────────────────────────────────────────
-        composable(Routes.Home.route) { HomeScreen(navController) }
-
-        // ─── Community ───────────────────────────────────────
-        composable(Routes.CommunityList.route) { CommunityListScreen(navController) }
-        composable(Routes.CommunityDetail.route) { CommunityDetailScreen(navController) }
-        composable(Routes.CreateCommunity.route) { CreateCommunityScreen(navController) }
-        composable(Routes.JoinRequest.route) { JoinRequestScreen(navController) }
-        composable(Routes.AdminDashboard.route) { AdminDashboardScreen(navController) }
-
-        // ─── Blood Request ───────────────────────────────────
-        composable(Routes.CreateRequest.route) { CreateRequestScreen(navController) }
-        composable(Routes.RequestDetail.route) { RequestDetailScreen(navController) }
-        composable(Routes.RequestFeed.route) { RequestFeedScreen(navController) }
-
-        // ─── Donor ───────────────────────────────────────────
-        composable(Routes.FindDonor.route) { FindDonorScreen(navController) }
-        composable(Routes.DonorProfile.route) { DonorProfileScreen(navController) }
-        composable(Routes.DonationHistory.route) { DonationHistoryScreen(navController) }
-        composable(Routes.Achievements.route) { AchievementsScreen(navController) }
-
-        // ─── Profile ─────────────────────────────────────────
-        composable(Routes.Profile.route) { ProfileScreen(navController) }
-        composable(Routes.EditProfile.route) { EditProfileScreen(navController) }
-
-        // ─── Settings & Notifications ────────────────────────
-        composable(Routes.Settings.route) { SettingsScreen(navController) }
-        composable(Routes.Notifications.route) { NotificationScreen(navController) }
     }
 }

@@ -231,8 +231,8 @@ fun SignUpScreen(
                 // Password strength meter
                 AnimatedVisibility(
                     visible = state.password.isNotEmpty(),
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut(),
+                    enter = expandVertically(animationSpec = tween(200, easing = LinearEasing)) + fadeIn(tween(200, easing = LinearEasing)),
+                    exit = shrinkVertically(animationSpec = tween(150, easing = LinearEasing)) + fadeOut(tween(150, easing = LinearEasing)),
                 ) {
                     Column {
                         Spacer(modifier = Modifier.height(8.dp))
@@ -318,8 +318,8 @@ fun SignUpScreen(
                 // Inline error
                 AnimatedVisibility(
                     visible = state.error != null && overlayState == AuthOverlayState.HIDDEN,
-                    enter = slideInVertically(initialOffsetY = { -20 }) + fadeIn(),
-                    exit = slideOutVertically(targetOffsetY = { -20 }) + fadeOut(),
+                    enter = slideInVertically(animationSpec = tween(200, easing = LinearEasing), initialOffsetY = { -20 }) + fadeIn(tween(200, easing = LinearEasing)),
+                    exit = slideOutVertically(animationSpec = tween(150, easing = LinearEasing), targetOffsetY = { -20 }) + fadeOut(tween(150, easing = LinearEasing)),
                 ) {
                     Card(
                         colors = CardDefaults.cardColors(

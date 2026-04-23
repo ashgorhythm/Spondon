@@ -1,0 +1,333 @@
+package com.spondon.app.core.data.repository
+
+import android.net.Uri
+import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
+import com.spondon.app.core.common.Resource
+import com.spondon.app.core.data.remote.FirestoreService
+import com.spondon.app.core.data.remote.StorageService
+import com.spondon.app.core.domain.model.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import java.util.Date
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class CommunityRepositoryImpl @Inject constructor(
+    private val auth: FirebaseAuth,
+    private val firestoreService: FirestoreService,
+    private val storageService: StorageService,
+) : CommunityRepository {
+
+    override suspend fun getCommunities(): Resource<List<Community>> {
+        return when (val result = firestoreService.getAllCommunities()) {
+            is Resource.Success -> Resource.Success(result.data.map { mapToCommunity(it) })
+            is Resource.Error -> Resource.Error(result.message)
+            is Resource.Loading -> Resource.Loading
+        }
+    }
+
+    override suspend fun getMyCommunities(userId: String): Resource<List<Community>> {
+        return when (val result = firestoreService.getMyCommunities(userId)) {
+            is Resource.Success -> Resource.Success(result.data.map { mapToCommunity(it) })
+            is Resource.Error -> Resource.Error(result.message)
+            is Resource.Loading -> Resource.Loading
+        }
+    }
+
+    override suspend fun getCommunity(communityId: String): Resource<Community> {
+        return when (val result = firestoreService.getCommunity(communityId)) {
+            is Resource.Success -> Resource.Success(mapToCommunity(result.data))
+            is Resource.Error -> Resource.Error(result.message)
+            is Resource.Loading -> Resource.Loading
+        }
+    }
+
+    override suspend fun createCommunity(community: Community): Resource<String> {
+        val data = mapOf<String, Any?>(
+            "name" to community.name,
+            "description" to community.description,
+            "coverUrl" to community.coverUrl,
+            "type" to community.type.name,
+            "adminIds" to community.adminIds,
+            "moderatorIds" to community.moderatorIds,
+            "memberIds" to community.memberIds,
+            "pendingIds" to community.pendingIds,
+            "district" to community.district,
+            "upazila" to community.upazila,
+            "bloodGroups" to community.bloodGroups,
+            "memberCount" to community.memberCount,
+            "donationCount" to community.donationCount,
+            "isVerified" to community.isVerified,
+            "createdAt" to Timestamp.now(),
+        )
+        return firestoreService.createCommunity(data)
+    }
+
+    override suspend fun updateCommunity(community: Community): Resource<Unit> {
+        val data = mapOf<String, Any?>(
+            "name" to community.name,
+            "description" to community.description,
+            "coverUrl" to community.coverUrl,
+            "type" to community.type.name,
+            "district" to community.district,
+            "upazila" to community.upazila,
+            "bloodGroups" to community.bloodGroups,
+        )
+        return firestoreService.updateCommunity(community.id, data)
+    }
+
+    override suspend fun joinCommunity(communityId: String, userId: String): Resource<Unit> {
+        return firestoreService.joinCommunity(communityId, userId)
+    }
+
+    override suspend fun requestToJoin(
+        communityId: String,
+        userId: String,
+        message: String,
+    ): Resource<Unit> {
+        // Add user to pending list
+        val pendingResult = firestoreService.addPendingMember(communityId, userId)
+        if (pendingResult is Resource.Error) return pendingResult
+
+        // Also create a join request document
+        val currentUser = auth.currentUser
+        val userResult = firestoreService.getUser(userId)
+        val userData = (userResult as? Resource.Success)?.data ?: emptyMap()
+
+        val data = mapOf<String, Any?>(
+            "userId" to userId,
+            "userName" to (userData["name"] as? String ?: currentUser?.displayName ?: ""),
+            "userBloodGroup" to (userData["bloodGroup"] as? String ?: ""),
+            "userDistrict" to (userData["district"] as? String ?: ""),
+            "userUpazila" to (userData["upazila"] as? String ?: ""),
+            "message" to message,
+            "status" to "PENDING",
+            "createdAt" to Timestamp.now(),
+        )
+        val createResult = firestoreService.createJoinRequest(communityId, data)
+        return when (createResult) {
+            is Resource.Success -> Resource.Success(Unit)
+            is Resource.Error -> Resource.Error(createResult.message)
+            is Resource.Loading -> Resource.Loading
+        }
+    }
+
+    override suspend fun approveMember(communityId: String, userId: String): Resource<Unit> {
+        // Remove from pending
+        firestoreService.removePendingMember(communityId, userId)
+        // Add as member
+        return firestoreService.joinCommunity(communityId, userId)
+    }
+
+    override suspend fun rejectMember(communityId: String, userId: String): Resource<Unit> {
+        return firestoreService.removePendingMember(communityId, userId)
+    }
+
+    override suspend fun removeMember(communityId: String, userId: String): Resource<Unit> {
+        return firestoreService.leaveCommunity(communityId, userId)
+    }
+
+    override suspend fun promoteMember(
+        communityId: String,
+        userId: String,
+        role: CommunityRole,
+    ): Resource<Unit> {
+        val roleField = when (role) {
+            CommunityRole.ADMIN -> "adminIds"
+            CommunityRole.MODERATOR -> "moderatorIds"
+            CommunityRole.MEMBER -> return Resource.Success(Unit) // No action needed
+        }
+        return firestoreService.promoteMember(communityId, userId, roleField)
+    }
+
+    /**
+     * Fetches pending join requests for the admin panel.
+     */
+    suspend fun getPendingJoinRequests(communityId: String): Resource<List<JoinRequest>> {
+        return when (val result = firestoreService.getPendingJoinRequests(communityId)) {
+            is Resource.Success -> Resource.Success(result.data.map { mapToJoinRequest(it) })
+            is Resource.Error -> Resource.Error(result.message)
+            is Resource.Loading -> Resource.Loading
+        }
+    }
+
+    /**
+     * Approves a join request — updates the request status and adds user as member.
+     */
+    suspend fun approveJoinRequest(
+        communityId: String,
+        requestId: String,
+        userId: String,
+    ): Resource<Unit> {
+        firestoreService.updateJoinRequestStatus(communityId, requestId, "APPROVED")
+        firestoreService.removePendingMember(communityId, userId)
+        return firestoreService.joinCommunity(communityId, userId)
+    }
+
+    /**
+     * Rejects a join request with an optional note.
+     */
+    suspend fun rejectJoinRequest(
+        communityId: String,
+        requestId: String,
+        userId: String,
+        note: String?,
+    ): Resource<Unit> {
+        firestoreService.updateJoinRequestStatus(communityId, requestId, "REJECTED", note)
+        return firestoreService.removePendingMember(communityId, userId)
+    }
+
+    /**
+     * Uploads a community cover image.
+     */
+    suspend fun uploadCoverImage(communityId: String, uri: Uri): Resource<String> {
+        return storageService.uploadCommunityCover(communityId, uri)
+    }
+
+    /**
+     * Gets all members of a community as User objects.
+     */
+    suspend fun getCommunityMembers(memberIds: List<String>): Resource<List<User>> {
+        return when (val result = firestoreService.getUsers(memberIds)) {
+            is Resource.Success -> Resource.Success(result.data.map { mapToUser(it) })
+            is Resource.Error -> Resource.Error(result.message)
+            is Resource.Loading -> Resource.Loading
+        }
+    }
+
+    /**
+     * Observes a community in real time.
+     */
+    fun observeCommunity(communityId: String): Flow<Community?> {
+        return firestoreService.observeCommunity(communityId).map { data ->
+            data?.let { mapToCommunity(it) }
+        }
+    }
+
+    /**
+     * Updates member donation status (admin action).
+     */
+    suspend fun updateMemberDonationStatus(
+        userId: String,
+        donationDate: Date,
+        totalDonations: Int,
+    ): Resource<Unit> {
+        return firestoreService.updateMemberDonationStatus(
+            userId,
+            Timestamp(donationDate),
+            totalDonations,
+        )
+    }
+
+    /**
+     * Admin overrides member availability at ≥90 days.
+     */
+    suspend fun overrideMemberAvailability(userId: String): Resource<Unit> {
+        return firestoreService.overrideMemberAvailability(userId)
+    }
+
+    /**
+     * Leaves a community.
+     */
+    suspend fun leaveCommunity(communityId: String, userId: String): Resource<Unit> {
+        return firestoreService.leaveCommunity(communityId, userId)
+    }
+
+    /**
+     * Cancels a pending join request.
+     */
+    suspend fun cancelJoinRequest(communityId: String, userId: String): Resource<Unit> {
+        return firestoreService.removePendingMember(communityId, userId)
+    }
+
+    // ─── Mappers ─────────────────────────────────────────────────
+
+    private fun mapToCommunity(data: Map<String, Any>): Community {
+        val createdAt = when (val ts = data["createdAt"]) {
+            is Timestamp -> ts.toDate()
+            is Date -> ts
+            else -> null
+        }
+        return Community(
+            id = data["id"] as? String ?: "",
+            name = data["name"] as? String ?: "",
+            description = data["description"] as? String ?: "",
+            coverUrl = data["coverUrl"] as? String ?: "",
+            type = try {
+                CommunityType.valueOf(data["type"] as? String ?: "PUBLIC")
+            } catch (_: Exception) {
+                CommunityType.PUBLIC
+            },
+            adminIds = (data["adminIds"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+            moderatorIds = (data["moderatorIds"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+            memberIds = (data["memberIds"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+            pendingIds = (data["pendingIds"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+            district = data["district"] as? String ?: "",
+            upazila = data["upazila"] as? String ?: "",
+            bloodGroups = (data["bloodGroups"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+            memberCount = (data["memberCount"] as? Number)?.toInt() ?: 0,
+            donationCount = (data["donationCount"] as? Number)?.toInt() ?: 0,
+            isVerified = data["isVerified"] as? Boolean ?: false,
+            createdAt = createdAt,
+        )
+    }
+
+    private fun mapToJoinRequest(data: Map<String, Any>): JoinRequest {
+        val createdAt = when (val ts = data["createdAt"]) {
+            is Timestamp -> ts.toDate()
+            is Date -> ts
+            else -> null
+        }
+        return JoinRequest(
+            id = data["id"] as? String ?: "",
+            userId = data["userId"] as? String ?: "",
+            userName = data["userName"] as? String ?: "",
+            userBloodGroup = data["userBloodGroup"] as? String ?: "",
+            userDistrict = data["userDistrict"] as? String ?: "",
+            userUpazila = data["userUpazila"] as? String ?: "",
+            message = data["message"] as? String ?: "",
+            status = try {
+                JoinRequestStatus.valueOf(data["status"] as? String ?: "PENDING")
+            } catch (_: Exception) {
+                JoinRequestStatus.PENDING
+            },
+            rejectionNote = data["rejectionNote"] as? String,
+            createdAt = createdAt,
+        )
+    }
+
+    private fun mapToUser(data: Map<String, Any>): User {
+        val dob = when (val d = data["dob"]) {
+            is Timestamp -> d.toDate()
+            is Date -> d
+            else -> null
+        }
+        val lastDonation = when (val d = data["lastDonationDate"]) {
+            is Timestamp -> d.toDate()
+            is Date -> d
+            else -> null
+        }
+        return User(
+            uid = data["uid"] as? String ?: "",
+            name = data["name"] as? String ?: "",
+            phone = data["phone"] as? String ?: "",
+            email = data["email"] as? String ?: "",
+            avatarUrl = data["avatarUrl"] as? String ?: "",
+            bloodGroup = data["bloodGroup"] as? String ?: "",
+            dob = dob,
+            weight = (data["weight"] as? Number)?.toFloat() ?: 0f,
+            isDonor = data["isDonor"] as? Boolean ?: false,
+            lastDonationDate = lastDonation,
+            donationInterval = (data["donationInterval"] as? Number)?.toInt() ?: 120,
+            availabilityOverride = data["availabilityOverride"] as? Boolean ?: false,
+            totalDonations = (data["totalDonations"] as? Number)?.toInt() ?: 0,
+            district = data["district"] as? String ?: "",
+            upazila = data["upazila"] as? String ?: "",
+            isPhoneVisible = data["isPhoneVisible"] as? Boolean ?: true,
+            communityIds = (data["communityIds"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+            badges = (data["badges"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+        )
+    }
+}

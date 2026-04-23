@@ -95,6 +95,13 @@ class UserRepositoryImpl @Inject constructor(
             isPhoneVisible = data["isPhoneVisible"] as? Boolean ?: true,
             communityIds = (data["communityIds"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
             badges = (data["badges"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+            role = try {
+                com.spondon.app.core.domain.model.UserRole.valueOf(
+                    data["role"] as? String ?: "USER"
+                )
+            } catch (_: Exception) {
+                com.spondon.app.core.domain.model.UserRole.USER
+            },
         )
     }
 }

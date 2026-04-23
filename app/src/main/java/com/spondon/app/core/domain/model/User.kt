@@ -22,5 +22,6 @@ data class User(
     val isPhoneVisible: Boolean = true,
     val badges: List<String> = emptyList(),
     val fcmToken: String = "",
+    val role: UserRole = UserRole.USER,
     val createdAt: Date? = null,
 )

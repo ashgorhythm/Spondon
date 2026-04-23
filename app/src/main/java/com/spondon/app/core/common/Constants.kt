@@ -14,4 +14,5 @@ object Constants {
     const val REQUESTS_COLLECTION = "requests"
     const val DONATIONS_COLLECTION = "donations"
     const val NOTIFICATIONS_COLLECTION = "notifications"
+    const val JOIN_REQUESTS_COLLECTION = "joinRequests"
 }

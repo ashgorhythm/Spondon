@@ -1,6 +1,7 @@
 package com.spondon.app.core.ui.components
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -42,8 +43,8 @@ fun AuthStateOverlay(
 ) {
     AnimatedVisibility(
         visible = state != AuthOverlayState.HIDDEN,
-        enter = fadeIn(animationSpec = tween(250)),
-        exit = fadeOut(animationSpec = tween(300)),
+        enter = fadeIn(animationSpec = tween(250, easing = LinearEasing)),
+        exit = fadeOut(animationSpec = tween(300, easing = LinearEasing)),
     ) {
         Box(
             modifier = Modifier
@@ -58,12 +59,12 @@ fun AuthStateOverlay(
                 AnimatedContent(
                     targetState = state,
                     transitionSpec = {
-                        (fadeIn(tween(300)) + scaleIn(
+                        (fadeIn(tween(300, easing = LinearEasing)) + scaleIn(
                             initialScale = 0.8f,
-                            animationSpec = tween(300),
-                        )) togetherWith (fadeOut(tween(200)) + scaleOut(
+                            animationSpec = tween(300, easing = LinearEasing),
+                        )) togetherWith (fadeOut(tween(200, easing = LinearEasing)) + scaleOut(
                             targetScale = 0.8f,
-                            animationSpec = tween(200),
+                            animationSpec = tween(200, easing = LinearEasing),
                         ))
                     },
                     label = "auth_overlay_content",
