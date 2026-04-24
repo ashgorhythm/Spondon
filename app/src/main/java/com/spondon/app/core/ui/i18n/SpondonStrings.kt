@@ -339,7 +339,7 @@ val Bn = SpondonStrings(
 val En = SpondonStrings(
     // Bottom nav
     home = "Home",
-    communities = "Communities",
+    communities = "Community",
     createRequest = "Request",
     findDonor = "Find Donor",
     profile = "Profile",

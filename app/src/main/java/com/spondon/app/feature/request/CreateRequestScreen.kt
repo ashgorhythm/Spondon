@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -102,8 +103,10 @@ fun CreateRequestScreen(
                             label = {
                                 Text(
                                     urgency.name,
+                                    modifier = Modifier.fillMaxWidth(),
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                     fontSize = 12.sp,
+                                    textAlign = TextAlign.Center,
                                 )
                             },
                             colors = FilterChipDefaults.filterChipColors(
@@ -118,11 +121,16 @@ fun CreateRequestScreen(
 
             // ─── Units Needed ────────────────────────────────
             item {
-                SectionHeader("Units Needed")
+                SectionHeader(
+                    text = "Units Needed",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
                 Spacer(Modifier.height(8.dp))
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
                 ) {
                     FilledIconButton(
                         onClick = { viewModel.updateUnits(state.unitsNeeded - 1) },
@@ -150,7 +158,7 @@ fun CreateRequestScreen(
                         Icon(Icons.Filled.Add, "Increase")
                     }
                     Text(
-                        text = "bag${if (state.unitsNeeded > 1) "s" else ""}",
+                        text = "unit${if (state.unitsNeeded > 1) "s" else ""}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                     )
@@ -358,14 +366,20 @@ fun CreateRequestScreen(
 }
 
 @Composable
-private fun SectionHeader(text: String) {
+private fun SectionHeader(
+    text: String,
+    modifier: Modifier = Modifier,
+    textAlign: TextAlign? = null,
+) {
     Text(
         text = text,
+        modifier = modifier,
         style = MaterialTheme.typography.titleSmall.copy(
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.5.sp,
         ),
         color = MaterialTheme.colorScheme.onBackground,
+        textAlign = textAlign,
     )
 }
 
