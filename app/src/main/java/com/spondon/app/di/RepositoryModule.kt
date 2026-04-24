@@ -22,4 +22,10 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindRequestRepository(impl: RequestRepositoryImpl): RequestRepository
+
+    @Binds @Singleton
+    abstract fun bindDonorRepository(impl: DonorRepositoryImpl): DonorRepository
+
+    @Binds @Singleton
+    abstract fun bindNotificationRepository(impl: NotificationRepositoryImpl): NotificationRepository
 }

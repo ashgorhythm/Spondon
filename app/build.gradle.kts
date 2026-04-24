@@ -78,5 +78,7 @@ dependencies {
     implementation(libs.credentials)
     implementation(libs.credentials.play.services)
     implementation(libs.googleid)
+    implementation(libs.play.services.location)
+    implementation(libs.androidx.biometric)
 
 }

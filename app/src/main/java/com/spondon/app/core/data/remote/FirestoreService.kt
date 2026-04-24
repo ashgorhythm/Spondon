@@ -488,10 +488,12 @@ class FirestoreService @Inject constructor(
         if (communityIds.isEmpty()) return Resource.Success(emptyList())
         return try {
             val results = mutableListOf<Map<String, Any>>()
+            // Avoid combining whereArrayContainsAny with orderBy
+            // as it requires a composite index that may not exist.
+            // Sort in memory instead.
             communityIds.chunked(30).forEach { chunk ->
                 val docs = firestore.collection(Constants.REQUESTS_COLLECTION)
                     .whereArrayContainsAny("communityIds", chunk)
-                    .orderBy("createdAt", Query.Direction.DESCENDING)
                     .get()
                     .await()
                 docs.documents.forEach { doc ->
@@ -500,7 +502,17 @@ class FirestoreService @Inject constructor(
                     }
                 }
             }
-            Resource.Success(results)
+            // Deduplicate (a request may belong to multiple communities)
+            val deduplicated = results.distinctBy { it["id"] }
+            // Sort by createdAt descending in memory
+            val sorted = deduplicated.sortedByDescending { data ->
+                when (val d = data["createdAt"]) {
+                    is com.google.firebase.Timestamp -> d.toDate().time
+                    is java.util.Date -> d.time
+                    else -> 0L
+                }
+            }
+            Resource.Success(sorted)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to get requests", e)
         }
@@ -513,13 +525,20 @@ class FirestoreService @Inject constructor(
         return try {
             val docs = firestore.collection(Constants.REQUESTS_COLLECTION)
                 .whereEqualTo("requesterId", userId)
-                .orderBy("createdAt", Query.Direction.DESCENDING)
                 .get()
                 .await()
             val list = docs.documents.mapNotNull { doc ->
                 if (doc.exists()) (doc.data ?: emptyMap()) + ("id" to doc.id) else null
             }
-            Resource.Success(list)
+            // Sort by createdAt descending in memory
+            val sorted = list.sortedByDescending { data ->
+                when (val d = data["createdAt"]) {
+                    is com.google.firebase.Timestamp -> d.toDate().time
+                    is java.util.Date -> d.time
+                    else -> 0L
+                }
+            }
+            Resource.Success(sorted)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to get user requests", e)
         }
@@ -539,7 +558,6 @@ class FirestoreService @Inject constructor(
             val limitedIds = communityIds.take(10)
             val listener = firestore.collection(Constants.REQUESTS_COLLECTION)
                 .whereArrayContainsAny("communityIds", limitedIds)
-                .orderBy("createdAt", Query.Direction.DESCENDING)
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
                         close(error)
@@ -548,7 +566,15 @@ class FirestoreService @Inject constructor(
                     val list = snapshot?.documents?.mapNotNull { doc ->
                         if (doc.exists()) (doc.data ?: emptyMap()) + ("id" to doc.id) else null
                     } ?: emptyList()
-                    trySend(list)
+                    // Sort in memory
+                    val sorted = list.sortedByDescending { data ->
+                        when (val d = data["createdAt"]) {
+                            is com.google.firebase.Timestamp -> d.toDate().time
+                            is java.util.Date -> d.time
+                            else -> 0L
+                        }
+                    }
+                    trySend(sorted)
                 }
             awaitClose { listener.remove() }
         }
@@ -608,6 +634,188 @@ class FirestoreService @Inject constructor(
             Resource.Success(docRef.id)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to record donation", e)
+        }
+    }
+
+    /**
+     * Fetches donation history for a specific user.
+     */
+    suspend fun getDonationsByUser(userId: String): Resource<List<Map<String, Any>>> {
+        return try {
+            val docs = firestore.collection(Constants.DONATIONS_COLLECTION)
+                .whereEqualTo("donorId", userId)
+                .get()
+                .await()
+            val list = docs.documents.mapNotNull { doc ->
+                if (doc.exists()) (doc.data ?: emptyMap()) + ("id" to doc.id) else null
+            }
+            // Sort by date descending in memory to avoid requiring composite index
+            val sorted = list.sortedByDescending { data ->
+                when (val d = data["date"]) {
+                    is com.google.firebase.Timestamp -> d.toDate().time
+                    is java.util.Date -> d.time
+                    else -> 0L
+                }
+            }
+            Resource.Success(sorted)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to get donations", e)
+        }
+    }
+
+    /**
+     * Searches donors by blood group, community, district, and availability.
+     * Filters are applied progressively.
+     */
+    suspend fun searchDonors(
+        bloodGroup: String?,
+        communityId: String?,
+        district: String?,
+        availableOnly: Boolean,
+    ): Resource<List<Map<String, Any>>> {
+        return try {
+            var query: com.google.firebase.firestore.Query =
+                firestore.collection(Constants.USERS_COLLECTION)
+                    .whereEqualTo("isDonor", true)
+
+            if (!bloodGroup.isNullOrBlank()) {
+                query = query.whereEqualTo("bloodGroup", bloodGroup)
+            }
+            if (!district.isNullOrBlank()) {
+                query = query.whereEqualTo("district", district)
+            }
+
+            val docs = query.get().await()
+            var results = docs.documents.mapNotNull { doc ->
+                if (doc.exists()) (doc.data ?: emptyMap()) + ("uid" to doc.id) else null
+            }
+
+            // Filter by community membership in memory (Firestore can't combine
+            // whereEqualTo on different array fields in a single query)
+            if (!communityId.isNullOrBlank()) {
+                results = results.filter { data ->
+                    val ids = (data["communityIds"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                    ids.contains(communityId)
+                }
+            }
+
+            // Filter by availability in memory
+            if (availableOnly) {
+                val now = System.currentTimeMillis()
+                results = results.filter { data ->
+                    val lastDonation = when (val d = data["lastDonationDate"]) {
+                        is com.google.firebase.Timestamp -> d.toDate().time
+                        is java.util.Date -> d.time
+                        else -> null
+                    }
+                    if (lastDonation == null) {
+                        true // Never donated, available
+                    } else {
+                        val daysSince = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(now - lastDonation)
+                        val interval = (data["donationInterval"] as? Number)?.toInt() ?: 120
+                        val overridden = data["availabilityOverride"] as? Boolean ?: false
+                        val requiredDays = if (overridden) Constants.MIN_OVERRIDE_DAYS else interval
+                        daysSince >= requiredDays
+                    }
+                }
+            }
+
+            Resource.Success(results)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to search donors", e)
+        }
+    }
+
+    /**
+     * Updates user badges list.
+     */
+    suspend fun updateUserBadges(userId: String, badges: List<String>): Resource<Unit> {
+        return try {
+            firestore.collection(Constants.USERS_COLLECTION)
+                .document(userId)
+                .update("badges", badges)
+                .await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to update badges", e)
+        }
+    }
+
+    // ─── Notifications ──────────────────────────────────────────
+
+    suspend fun getNotifications(userId: String): Resource<List<Map<String, Any>>> {
+        return try {
+            val docs = firestore.collection(Constants.NOTIFICATIONS_COLLECTION)
+                .whereEqualTo("userId", userId)
+                .get()
+                .await()
+            val list = docs.documents.mapNotNull { doc ->
+                if (doc.exists()) (doc.data ?: emptyMap()) + ("id" to doc.id) else null
+            }
+            val sorted = list.sortedByDescending { data ->
+                when (val d = data["createdAt"]) {
+                    is com.google.firebase.Timestamp -> d.toDate().time
+                    is java.util.Date -> d.time
+                    else -> 0L
+                }
+            }
+            Resource.Success(sorted)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to get notifications", e)
+        }
+    }
+
+    suspend fun markNotificationRead(notificationId: String): Resource<Unit> {
+        return try {
+            firestore.collection(Constants.NOTIFICATIONS_COLLECTION)
+                .document(notificationId)
+                .update("isRead", true)
+                .await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to mark notification as read", e)
+        }
+    }
+
+    suspend fun markAllNotificationsRead(userId: String): Resource<Unit> {
+        return try {
+            val docs = firestore.collection(Constants.NOTIFICATIONS_COLLECTION)
+                .whereEqualTo("userId", userId)
+                .whereEqualTo("isRead", false)
+                .get()
+                .await()
+            val batch = firestore.batch()
+            docs.documents.forEach { doc ->
+                batch.update(doc.reference, "isRead", true)
+            }
+            batch.commit().await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to mark all as read", e)
+        }
+    }
+
+    suspend fun deleteNotification(notificationId: String): Resource<Unit> {
+        return try {
+            firestore.collection(Constants.NOTIFICATIONS_COLLECTION)
+                .document(notificationId)
+                .delete()
+                .await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to delete notification", e)
+        }
+    }
+
+    suspend fun deleteUserAccount(userId: String): Resource<Unit> {
+        return try {
+            firestore.collection(Constants.USERS_COLLECTION)
+                .document(userId)
+                .delete()
+                .await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to delete account", e)
         }
     }
 }

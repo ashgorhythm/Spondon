@@ -28,6 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.spondon.app.core.domain.model.BloodRequest
 import com.spondon.app.core.domain.model.Urgency
+import com.spondon.app.core.ui.i18n.S
 import com.spondon.app.core.ui.theme.*
 import com.spondon.app.navigation.Routes
 
@@ -39,6 +40,8 @@ fun HomeScreen(
     val state by viewModel.homeState.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.loadHome() }
+
+    val s = S.strings
 
     LazyColumn(
         modifier = Modifier
@@ -64,7 +67,7 @@ fun HomeScreen(
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                     Text(
-                        text = "Welcome to Spondon",
+                        text = s.homeTitle,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                     )
@@ -84,7 +87,7 @@ fun HomeScreen(
                     ) {
                         Icon(
                             Icons.Outlined.Notifications,
-                            contentDescription = "Notifications",
+                            contentDescription = s.notifications,
                             tint = MaterialTheme.colorScheme.onBackground,
                         )
                     }
@@ -126,7 +129,7 @@ fun HomeScreen(
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text = "Every drop counts. Be someone's hero today.",
+                                text = if (s == com.spondon.app.core.ui.i18n.Bn) "প্রতিটি ফোঁটা গুরুত্বপূর্ণ। আজই কারো নায়ক হোন।" else "Every drop counts. Be someone's hero today.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color.White.copy(alpha = 0.8f),
                             )
@@ -195,19 +198,19 @@ fun HomeScreen(
             ) {
                 StatCard(
                     icon = Icons.Outlined.Groups,
-                    label = "Total Donors",
+                    label = s.nearbyDonors,
                     value = "${state.totalDonors}",
                     modifier = Modifier.weight(1f),
                 )
                 StatCard(
                     icon = Icons.Outlined.CheckCircle,
-                    label = "Fulfilled",
+                    label = s.fulfilled,
                     value = "${state.fulfilledRequests}",
                     modifier = Modifier.weight(1f),
                 )
                 StatCard(
                     icon = Icons.Outlined.Pending,
-                    label = "Pending",
+                    label = s.pending,
                     value = "${state.pendingRequests}",
                     modifier = Modifier.weight(1f),
                 )
@@ -218,7 +221,7 @@ fun HomeScreen(
         // ─── Quick Actions Grid ──────────────────────────────
         item {
             Text(
-                text = "Quick Actions",
+                text = s.quickActions,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 modifier = Modifier.padding(horizontal = 20.dp),
                 color = MaterialTheme.colorScheme.onBackground,
@@ -233,30 +236,30 @@ fun HomeScreen(
             ) {
                 QuickActionCard(
                     icon = Icons.Filled.Bloodtype,
-                    label = "Request\nBlood",
+                    label = if (s == com.spondon.app.core.ui.i18n.Bn) "রক্ত\nচাই" else "Request\nBlood",
                     color = BloodRed,
                     onClick = { navController.navigate(Routes.CreateRequest.route) },
                     modifier = Modifier.weight(1f),
                 )
                 QuickActionCard(
                     icon = Icons.Filled.Search,
-                    label = "Find\nDonor",
+                    label = if (s == com.spondon.app.core.ui.i18n.Bn) "ডোনার\nখুঁজুন" else "Find\nDonor",
                     color = SoftRose,
                     onClick = { navController.navigate(Routes.FindDonor.route) },
                     modifier = Modifier.weight(1f),
                 )
                 QuickActionCard(
                     icon = Icons.Filled.VolunteerActivism,
-                    label = "Donation\nTips",
+                    label = if (s == com.spondon.app.core.ui.i18n.Bn) "ডোনেশন\nটিপস" else "Donation\nTips",
                     color = AvailableGreen,
                     onClick = { /* Tips screen */ },
                     modifier = Modifier.weight(1f),
                 )
                 QuickActionCard(
-                    icon = Icons.Filled.HealthAndSafety,
-                    label = "Health\nTips",
+                    icon = Icons.Filled.People,
+                    label = s.communities,
                     color = PendingAmber,
-                    onClick = { /* Health tips */ },
+                    onClick = { navController.navigate(Routes.CommunityList.route) },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -273,12 +276,12 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Urgent Requests",
+                    text = s.urgentRequests,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 TextButton(onClick = { navController.navigate(Routes.RequestFeed.route) }) {
-                    Text("View All", color = BloodRed)
+                    Text(s.viewAll, color = BloodRed)
                 }
             }
         }

@@ -1,5 +1,10 @@
 package com.spondon.app.feature.auth
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.location.Geocoder
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -47,20 +52,30 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.spondon.app.core.ui.components.SpondonButton
 import com.spondon.app.core.ui.components.StepProgressBar
 import com.spondon.app.core.ui.theme.AvailableGreen
 import com.spondon.app.core.ui.theme.BloodRed
+import com.spondon.app.core.ui.theme.PendingAmber
 import com.spondon.app.core.ui.theme.UrgencyCritical
 import com.spondon.app.navigation.Routes
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,9 +85,13 @@ fun LocationSetupScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     var districtExpanded by remember { mutableStateOf(false) }
     var upazilaExpanded by remember { mutableStateOf(false) }
+    var isLocating by remember { mutableStateOf(false) }
+    var locationError by remember { mutableStateOf<String?>(null) }
 
     // Use the ViewModel state directly — no local copies that can drift.
     val selectedDistrict = state.selectedDistrict
@@ -95,6 +114,26 @@ fun LocationSetupScreen(
     // Using a derived boolean prevents flicker/crash from rapid recomposition.
     val showUpazila by remember(selectedDistrict) {
         derivedStateOf { selectedDistrict.isNotEmpty() }
+    }
+
+    // Location permission launcher
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+    ) { permissions ->
+        val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+
+        if (fineGranted || coarseGranted) {
+            // Permission granted — fetch location
+            isLocating = true
+            locationError = null
+            fetchCurrentLocation(context, scope, viewModel) { error ->
+                isLocating = false
+                locationError = error
+            }
+        } else {
+            locationError = "Location permission denied. Please select your district manually."
+        }
     }
 
     // Navigate to home on successful sign-up via one-shot event
@@ -158,6 +197,66 @@ fun LocationSetupScreen(
             )
 
             Spacer(modifier = Modifier.height(28.dp))
+
+            // Use current location button
+            OutlinedButton(
+                onClick = {
+                    locationError = null
+                    locationPermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                        ),
+                    )
+                },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = MaterialTheme.shapes.medium,
+                enabled = !isLocating,
+            ) {
+                if (isLocating) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = BloodRed, strokeWidth = 2.dp)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Detecting location...")
+                } else {
+                    Icon(Icons.Default.MyLocation, contentDescription = null, tint = BloodRed)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Use my current location")
+                }
+            }
+
+            // Location detection error
+            if (locationError != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = PendingAmber.copy(alpha = 0.1f)),
+                    shape = MaterialTheme.shapes.small,
+                ) {
+                    Text(
+                        text = locationError!!,
+                        color = PendingAmber,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // OR divider
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                androidx.compose.material3.HorizontalDivider(modifier = Modifier.weight(1f))
+                Text(
+                    "  or select manually  ",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                )
+                androidx.compose.material3.HorizontalDivider(modifier = Modifier.weight(1f))
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // District Picker
             Text(
@@ -256,18 +355,7 @@ fun LocationSetupScreen(
                 }
             }
 
-            // Use current location
-            OutlinedButton(
-                onClick = { /* Location permission + GPS fill */ },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Icon(Icons.Default.MyLocation, contentDescription = null, tint = BloodRed)
-                Spacer(modifier = Modifier.width(12.dp))
-                Text("Use my current location")
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Privacy note
             Card(
@@ -366,5 +454,97 @@ fun LocationSetupScreen(
                 CircularProgressIndicator(color = BloodRed)
             }
         }
+    }
+}
+
+/**
+ * Fetches the current device location using FusedLocationProviderClient
+ * and reverse-geocodes it to find the district and upazila in Bangladesh.
+ */
+@SuppressLint("MissingPermission")
+private fun fetchCurrentLocation(
+    context: android.content.Context,
+    scope: kotlinx.coroutines.CoroutineScope,
+    viewModel: AuthViewModel,
+    onComplete: (error: String?) -> Unit,
+) {
+    val fusedClient = LocationServices.getFusedLocationProviderClient(context)
+    val cts = CancellationTokenSource()
+
+    fusedClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+        .addOnSuccessListener { location ->
+            if (location == null) {
+                onComplete("Could not determine your location. Please select manually.")
+                return@addOnSuccessListener
+            }
+
+            scope.launch {
+                try {
+                    val (district, upazila) = withContext(Dispatchers.IO) {
+                        reverseGeocode(context, location.latitude, location.longitude)
+                    }
+                    if (district != null) {
+                        // Try to match with our BangladeshData
+                        val matchedDistrict = BangladeshData.districtNames.find {
+                            it.equals(district, ignoreCase = true)
+                        }
+                        if (matchedDistrict != null) {
+                            viewModel.selectDistrict(matchedDistrict)
+                            if (upazila != null) {
+                                val matchedUpazila = BangladeshData.getUpazilas(matchedDistrict).find {
+                                    it.equals(upazila, ignoreCase = true) || upazila.contains(it, ignoreCase = true) || it.contains(upazila, ignoreCase = true)
+                                }
+                                if (matchedUpazila != null) {
+                                    viewModel.selectUpazila(matchedUpazila)
+                                }
+                            }
+                            onComplete(null)
+                        } else {
+                            onComplete("Detected: $district. Could not match — please select manually.")
+                        }
+                    } else {
+                        onComplete("Could not determine your district. Please select manually.")
+                    }
+                } catch (e: Exception) {
+                    onComplete("Location detection failed: ${e.message}")
+                }
+            }
+        }
+        .addOnFailureListener { e ->
+            onComplete("Location detection failed: ${e.message}")
+        }
+}
+
+@Suppress("DEPRECATION")
+private fun reverseGeocode(
+    context: android.content.Context,
+    lat: Double,
+    lon: Double,
+): Pair<String?, String?> {
+    return try {
+        val geocoder = Geocoder(context, Locale("en", "BD"))
+        val addresses = geocoder.getFromLocation(lat, lon, 5) ?: return null to null
+        if (addresses.isEmpty()) return null to null
+
+        // Try to find district and upazila from the address components
+        var district: String? = null
+        var upazila: String? = null
+
+        for (address in addresses) {
+            // The "adminArea" is typically the division, "subAdminArea" is the district
+            if (district == null) {
+                district = address.subAdminArea ?: address.locality
+            }
+            if (upazila == null) {
+                upazila = address.locality ?: address.subLocality
+            }
+            // Clean up district name
+            district = district?.replace(" District", "")?.replace(" Zila", "")?.trim()
+            if (district != null && upazila != null) break
+        }
+
+        district to upazila
+    } catch (e: Exception) {
+        null to null
     }
 }

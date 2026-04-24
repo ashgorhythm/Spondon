@@ -16,22 +16,39 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.spondon.app.core.ui.i18n.S
 import com.spondon.app.core.ui.theme.BloodRed
 
 data class BottomNavItem(
-    val label: String,
+    val labelKey: String, // key into SpondonStrings
     val route: String,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
 )
 
 val bottomNavItems = listOf(
-    BottomNavItem("Home", "home", Icons.Filled.Home, Icons.Outlined.Home),
-    BottomNavItem("Community", "community_list", Icons.Filled.Groups, Icons.Outlined.Groups),
-    BottomNavItem("Request", "create_request", Icons.Filled.Bloodtype, Icons.Outlined.Bloodtype),
-    BottomNavItem("Donors", "find_donor", Icons.Filled.Search, Icons.Outlined.Search),
-    BottomNavItem("Profile", "profile", Icons.Filled.Person, Icons.Outlined.Person),
+    BottomNavItem("home", "home", Icons.Filled.Home, Icons.Outlined.Home),
+    BottomNavItem("communities", "community_list", Icons.Filled.Groups, Icons.Outlined.Groups),
+    BottomNavItem("createRequest", "create_request", Icons.Filled.Bloodtype, Icons.Outlined.Bloodtype),
+    BottomNavItem("findDonor", "find_donor", Icons.Filled.Search, Icons.Outlined.Search),
+    BottomNavItem("profile", "profile", Icons.Filled.Person, Icons.Outlined.Person),
 )
+
+/**
+ * Resolves the translated label for a nav item key.
+ */
+@Composable
+private fun resolveLabel(key: String): String {
+    val s = S.strings
+    return when (key) {
+        "home" -> s.home
+        "communities" -> s.communities
+        "createRequest" -> s.createRequest
+        "findDonor" -> s.findDonor
+        "profile" -> s.profile
+        else -> key
+    }
+}
 
 @Composable
 fun SpondonBottomNav(
@@ -64,6 +81,7 @@ fun SpondonBottomNav(
         ) {
             bottomNavItems.forEachIndexed { index, item ->
                 val isSelected = index == selectedIndex
+                val label = resolveLabel(item.labelKey)
 
                 Column(
                     modifier = Modifier
@@ -79,7 +97,7 @@ fun SpondonBottomNav(
                 ) {
                     Icon(
                         imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-                        contentDescription = item.label,
+                        contentDescription = label,
                         modifier = Modifier.size(24.dp),
                         tint = if (isSelected) BloodRed
                         else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
@@ -88,7 +106,7 @@ fun SpondonBottomNav(
                     Spacer(Modifier.height(2.dp))
 
                     Text(
-                        text = item.label,
+                        text = label,
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontSize = 10.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,

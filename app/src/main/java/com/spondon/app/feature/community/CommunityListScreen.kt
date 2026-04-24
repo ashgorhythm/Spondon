@@ -29,6 +29,7 @@ import coil.compose.AsyncImage
 import com.spondon.app.core.domain.model.Community
 import com.spondon.app.core.domain.model.CommunityType
 import com.spondon.app.core.ui.components.BloodGroupBadge
+import com.spondon.app.core.ui.i18n.S
 import com.spondon.app.core.ui.theme.*
 import com.spondon.app.navigation.Routes
 
@@ -54,19 +55,21 @@ fun CommunityListScreen(
         }
     }
 
+    val s = S.strings
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        "Communities",
+                        s.communities,
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = s.back)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -81,7 +84,7 @@ fun CommunityListScreen(
                 contentColor = DarkOnPrimary,
                 shape = CircleShape,
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Create Community")
+                Icon(Icons.Default.Add, contentDescription = s.createCommunity)
             }
         },
     ) { padding ->
@@ -101,7 +104,7 @@ fun CommunityListScreen(
                     onClick = { viewModel.setListTab(0) },
                     text = {
                         Text(
-                            "My Communities",
+                            s.myCommunities,
                             fontWeight = if (state.selectedTab == 0) FontWeight.Bold else FontWeight.Normal,
                         )
                     },
@@ -164,7 +167,7 @@ fun CommunityListScreen(
                             Text(state.error ?: "Unknown error", color = MaterialTheme.colorScheme.error)
                             Spacer(Modifier.height(16.dp))
                             TextButton(onClick = { viewModel.loadCommunities() }) {
-                                Text("Retry", color = BloodRed)
+                                Text(s.retry, color = BloodRed)
                             }
                         }
                     }
