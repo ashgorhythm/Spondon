@@ -262,11 +262,12 @@ private fun SettingsDisabledItem(icon: ImageVector, title: String, subtitle: Str
 
 @Composable
 private fun SettingsRadioItem(icon: ImageVector, title: String, selected: Boolean, onClick: () -> Unit) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = if (selected) BloodRed.copy(alpha = 0.06f) else MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        color = if (selected) BloodRed.copy(alpha = 0.06f) else MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
     ) {
         Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = if (selected) BloodRed else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
@@ -279,11 +280,12 @@ private fun SettingsRadioItem(icon: ImageVector, title: String, selected: Boolea
 
 @Composable
 private fun SettingsClickItem(icon: ImageVector, title: String, subtitle: String, accentColor: Color, onClick: () -> Unit) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = accentColor.copy(alpha = 0.06f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        color = accentColor.copy(alpha = 0.06f),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
     ) {
         Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = accentColor, modifier = Modifier.size(20.dp))

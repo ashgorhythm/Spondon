@@ -468,51 +468,96 @@ private fun fetchCurrentLocation(
     viewModel: AuthViewModel,
     onComplete: (error: String?) -> Unit,
 ) {
-    val fusedClient = LocationServices.getFusedLocationProviderClient(context)
-    val cts = CancellationTokenSource()
+    try {
+        val fusedClient = LocationServices.getFusedLocationProviderClient(context)
+        val cts = CancellationTokenSource()
 
-    fusedClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
-        .addOnSuccessListener { location ->
-            if (location == null) {
-                onComplete("Could not determine your location. Please select manually.")
-                return@addOnSuccessListener
-            }
-
-            scope.launch {
-                try {
-                    val (district, upazila) = withContext(Dispatchers.IO) {
-                        reverseGeocode(context, location.latitude, location.longitude)
-                    }
-                    if (district != null) {
-                        // Try to match with our BangladeshData
-                        val matchedDistrict = BangladeshData.districtNames.find {
-                            it.equals(district, ignoreCase = true)
-                        }
-                        if (matchedDistrict != null) {
-                            viewModel.selectDistrict(matchedDistrict)
-                            if (upazila != null) {
-                                val matchedUpazila = BangladeshData.getUpazilas(matchedDistrict).find {
-                                    it.equals(upazila, ignoreCase = true) || upazila.contains(it, ignoreCase = true) || it.contains(upazila, ignoreCase = true)
-                                }
-                                if (matchedUpazila != null) {
-                                    viewModel.selectUpazila(matchedUpazila)
+        fusedClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+            .addOnSuccessListener { location ->
+                if (location != null) {
+                    handleLocation(context, scope, viewModel, location, onComplete)
+                } else {
+                    // Fallback: try getLastLocation
+                    try {
+                        fusedClient.lastLocation
+                            .addOnSuccessListener { lastLocation ->
+                                if (lastLocation != null) {
+                                    handleLocation(context, scope, viewModel, lastLocation, onComplete)
+                                } else {
+                                    onComplete("Could not determine your location. Please make sure GPS is enabled and try again, or select manually.")
                                 }
                             }
-                            onComplete(null)
-                        } else {
-                            onComplete("Detected: $district. Could not match — please select manually.")
-                        }
-                    } else {
-                        onComplete("Could not determine your district. Please select manually.")
+                            .addOnFailureListener { e ->
+                                onComplete("Location detection failed: ${e.message}")
+                            }
+                    } catch (e: SecurityException) {
+                        onComplete("Location permission required. Please select manually.")
                     }
-                } catch (e: Exception) {
-                    onComplete("Location detection failed: ${e.message}")
                 }
             }
-        }
-        .addOnFailureListener { e ->
+            .addOnFailureListener { e ->
+                // Fallback: try getLastLocation
+                try {
+                    fusedClient.lastLocation
+                        .addOnSuccessListener { lastLocation ->
+                            if (lastLocation != null) {
+                                handleLocation(context, scope, viewModel, lastLocation, onComplete)
+                            } else {
+                                onComplete("Location detection failed: ${e.message}")
+                            }
+                        }
+                        .addOnFailureListener {
+                            onComplete("Location detection failed: ${e.message}")
+                        }
+                } catch (se: SecurityException) {
+                    onComplete("Location permission required. Please select manually.")
+                }
+            }
+    } catch (e: SecurityException) {
+        onComplete("Location permission required. Please select manually.")
+    } catch (e: Exception) {
+        onComplete("Location detection failed: ${e.message}")
+    }
+}
+
+private fun handleLocation(
+    context: android.content.Context,
+    scope: kotlinx.coroutines.CoroutineScope,
+    viewModel: AuthViewModel,
+    location: android.location.Location,
+    onComplete: (error: String?) -> Unit,
+) {
+    scope.launch {
+        try {
+            val (district, upazila) = withContext(Dispatchers.IO) {
+                reverseGeocode(context, location.latitude, location.longitude)
+            }
+            if (district != null) {
+                // Try to match with our BangladeshData
+                val matchedDistrict = BangladeshData.districtNames.find {
+                    it.equals(district, ignoreCase = true)
+                }
+                if (matchedDistrict != null) {
+                    viewModel.selectDistrict(matchedDistrict)
+                    if (upazila != null) {
+                        val matchedUpazila = BangladeshData.getUpazilas(matchedDistrict).find {
+                            it.equals(upazila, ignoreCase = true) || upazila.contains(it, ignoreCase = true) || it.contains(upazila, ignoreCase = true)
+                        }
+                        if (matchedUpazila != null) {
+                            viewModel.selectUpazila(matchedUpazila)
+                        }
+                    }
+                    onComplete(null)
+                } else {
+                    onComplete("Detected: $district. Could not match — please select manually.")
+                }
+            } else {
+                onComplete("Could not determine your district. Please select manually.")
+            }
+        } catch (e: Exception) {
             onComplete("Location detection failed: ${e.message}")
         }
+    }
 }
 
 @Suppress("DEPRECATION")
@@ -521,6 +566,10 @@ private fun reverseGeocode(
     lat: Double,
     lon: Double,
 ): Pair<String?, String?> {
+    // Check if Geocoder is available on this device
+    if (!Geocoder.isPresent()) {
+        return null to null
+    }
     return try {
         val geocoder = Geocoder(context, Locale("en", "BD"))
         val addresses = geocoder.getFromLocation(lat, lon, 5) ?: return null to null
@@ -533,13 +582,22 @@ private fun reverseGeocode(
         for (address in addresses) {
             // The "adminArea" is typically the division, "subAdminArea" is the district
             if (district == null) {
-                district = address.subAdminArea ?: address.locality
+                district = address.subAdminArea ?: address.locality ?: address.adminArea
             }
             if (upazila == null) {
                 upazila = address.locality ?: address.subLocality
+                // If upazila matches district, try subLocality instead
+                if (upazila != null && upazila.equals(district, ignoreCase = true)) {
+                    upazila = address.subLocality
+                }
             }
             // Clean up district name
-            district = district?.replace(" District", "")?.replace(" Zila", "")?.trim()
+            district = district
+                ?.replace(" District", "")
+                ?.replace(" Zila", "")
+                ?.replace(" district", "")
+                ?.replace(" zila", "")
+                ?.trim()
             if (district != null && upazila != null) break
         }
 

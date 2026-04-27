@@ -210,7 +210,8 @@ fun OtpScreen(
                             }
                         },
                         modifier = Modifier
-                            .size(52.dp)
+                            .weight(1f)
+                            .aspectRatio(1f)
                             .clip(RoundedCornerShape(14.dp))
                             .then(
                                 if (state.error != null) {

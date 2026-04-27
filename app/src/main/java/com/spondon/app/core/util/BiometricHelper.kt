@@ -14,16 +14,15 @@ import androidx.fragment.app.FragmentActivity
  */
 object BiometricHelper {
 
+    private const val AUTHENTICATORS = BiometricManager.Authenticators.BIOMETRIC_WEAK
+
     /**
      * Returns true if the device has enrolled biometric credentials
      * (fingerprint or face) that are ready to use.
      */
     fun canAuthenticate(context: Context): Boolean {
         val biometricManager = BiometricManager.from(context)
-        return biometricManager.canAuthenticate(
-            BiometricManager.Authenticators.BIOMETRIC_STRONG or
-                    BiometricManager.Authenticators.BIOMETRIC_WEAK
-        ) == BiometricManager.BIOMETRIC_SUCCESS
+        return biometricManager.canAuthenticate(AUTHENTICATORS) == BiometricManager.BIOMETRIC_SUCCESS
     }
 
     /**
@@ -77,10 +76,7 @@ object BiometricHelper {
             .setTitle(title)
             .setSubtitle(subtitle)
             .setNegativeButtonText(negativeButtonText)
-            .setAllowedAuthenticators(
-                BiometricManager.Authenticators.BIOMETRIC_STRONG or
-                        BiometricManager.Authenticators.BIOMETRIC_WEAK
-            )
+            .setAllowedAuthenticators(AUTHENTICATORS)
             .build()
 
         biometricPrompt.authenticate(promptInfo)

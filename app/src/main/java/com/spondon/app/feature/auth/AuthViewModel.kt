@@ -146,15 +146,38 @@ class AuthViewModel @Inject constructor(
                             }
                         }
                         is Resource.Error -> {
-                            _state.update { it.copy(isLoading = false, error = result.message) }
-                        }
-                        else -> {
-                            // Firestore has no data but user is authenticated — needs profile setup
+                            // User authenticated but no Firestore doc — create a stub profile
+                            // This happens for phone OTP users who just signed up
+                            val currentState = _state.value
+                            val phoneNumber = currentState.otpPhone.ifEmpty { currentState.phoneLoginNumber }
+                            val stubUser = User(
+                                uid = uid,
+                                phone = phoneNumber,
+                                name = currentState.fullName,
+                                email = currentState.email,
+                            )
+                            // Create the stub in Firestore so profile setup can update it later
+                            userRepository.updateUser(stubUser)
                             _state.update {
                                 it.copy(
                                     isLoading = false,
                                     isLoggedIn = true,
                                     needsProfileSetup = true,
+                                    phone = phoneNumber,
+                                )
+                            }
+                            _navigationEvent.send(AuthNavigationEvent.NavigateToProfileSetup)
+                        }
+                        else -> {
+                            // Firestore has no data but user is authenticated — needs profile setup
+                            val currentState = _state.value
+                            val phoneNumber = currentState.otpPhone.ifEmpty { currentState.phoneLoginNumber }
+                            _state.update {
+                                it.copy(
+                                    isLoading = false,
+                                    isLoggedIn = true,
+                                    needsProfileSetup = true,
+                                    phone = phoneNumber,
                                 )
                             }
                             _navigationEvent.send(AuthNavigationEvent.NavigateToProfileSetup)

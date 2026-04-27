@@ -154,9 +154,8 @@ class CommunityViewModel @Inject constructor(
                 is Resource.Loading -> emptyList()
             }
 
-            // Discover = all communities excluding ones user already joined
-            val myIds = myCommunities.map { it.id }.toSet()
-            val discover = allCommunities.filter { it.id !in myIds }
+            // Discover = all communities (show all available communities)
+            val discover = allCommunities
 
             _listState.update {
                 it.copy(

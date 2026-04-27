@@ -203,17 +203,21 @@ fun CommunityListScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             items(communities, key = { it.id }) { community ->
+                                val isJoined = state.myCommunities.any { it.id == community.id }
                                 CommunityCard(
                                     community = community,
                                     isDiscover = state.selectedTab == 1,
+                                    isJoined = isJoined,
                                     onClick = {
                                         navController.navigate("community_detail/${community.id}")
                                     },
                                     onJoin = {
-                                        if (community.type == CommunityType.PUBLIC) {
-                                            viewModel.joinPublicCommunity(community.id)
-                                        } else {
-                                            navController.navigate("join_request/${community.id}")
+                                        if (!isJoined) {
+                                            if (community.type == CommunityType.PUBLIC) {
+                                                viewModel.joinPublicCommunity(community.id)
+                                            } else {
+                                                navController.navigate("join_request/${community.id}")
+                                            }
                                         }
                                     },
                                 )
@@ -230,6 +234,7 @@ fun CommunityListScreen(
 private fun CommunityCard(
     community: Community,
     isDiscover: Boolean,
+    isJoined: Boolean = false,
     onClick: () -> Unit,
     onJoin: () -> Unit,
 ) {
@@ -370,17 +375,31 @@ private fun CommunityCard(
                     // Join button (Discover tab)
                     if (isDiscover) {
                         Spacer(Modifier.width(8.dp))
-                        Button(
-                            onClick = onJoin,
-                            shape = RoundedCornerShape(20.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = BloodRed),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                        ) {
-                            Text(
-                                if (community.type == CommunityType.PUBLIC) "Join"
-                                else "Request",
-                                style = MaterialTheme.typography.labelLarge,
-                            )
+                        if (isJoined) {
+                            OutlinedButton(
+                                onClick = {},
+                                shape = RoundedCornerShape(20.dp),
+                                enabled = false,
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                            ) {
+                                Text(
+                                    "Joined",
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            }
+                        } else {
+                            Button(
+                                onClick = onJoin,
+                                shape = RoundedCornerShape(20.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = BloodRed),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                            ) {
+                                Text(
+                                    if (community.type == CommunityType.PUBLIC) "Join"
+                                    else "Request",
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            }
                         }
                     }
                 }

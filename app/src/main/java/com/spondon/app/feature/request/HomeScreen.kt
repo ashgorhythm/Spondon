@@ -328,7 +328,7 @@ fun HomeScreen(
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = "No urgent requests right now",
+                            text = "No active blood requests",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                         )
@@ -336,7 +336,7 @@ fun HomeScreen(
                 }
             }
         } else {
-            items(state.urgentRequests.take(5), key = { it.id }) { request ->
+            items(state.urgentRequests.take(10), key = { it.id }) { request ->
                 RequestCard(
                     request = request,
                     onClick = {

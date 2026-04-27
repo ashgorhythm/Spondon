@@ -219,8 +219,33 @@ fun ProfileScreen(
                             QuickLinkItem(Icons.Outlined.EmojiEvents, s.achievements, onClick = { navController.navigate(Routes.Achievements.route) })
                             QuickLinkItem(Icons.Outlined.Notifications, s.notifications, onClick = { navController.navigate(Routes.Notifications.route) })
                             QuickLinkItem(Icons.Outlined.Settings, s.settings, onClick = { navController.navigate(Routes.Settings.route) })
-                            QuickLinkItem(Icons.Outlined.Info, "Info", onClick = { navController.navigate(Routes.Info.route) })
+                            QuickLinkItem(Icons.Outlined.Info, "About", onClick = { navController.navigate(Routes.About.route) })
                             QuickLinkItem(Icons.Filled.VolunteerActivism, "Support", onClick = { navController.navigate(Routes.Support.route) })
+                        }
+                    }
+
+                    // ─── App Footer ───────────────────────
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp, bottom = 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text = "স্পন্দন — Spondon",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp,
+                                ),
+                                color = BloodRed.copy(alpha = 0.7f),
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "Made with ❤ by Ash",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                            )
                         }
                     }
                 }

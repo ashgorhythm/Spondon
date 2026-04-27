@@ -133,8 +133,15 @@ class RequestViewModel @Inject constructor(
             val allRequests = (reqResult as? Resource.Success)?.data ?: emptyList()
             val activeRequests = allRequests.filter { it.status == RequestStatus.ACTIVE }
             val urgent = activeRequests
-                .filter { it.urgency == Urgency.CRITICAL }
-                .sortedByDescending { it.createdAt }
+                .sortedWith(
+                    compareByDescending<BloodRequest> {
+                        when (it.urgency) {
+                            Urgency.CRITICAL -> 2
+                            Urgency.MODERATE -> 1
+                            Urgency.NORMAL -> 0
+                        }
+                    }.thenByDescending { it.createdAt }
+                )
 
             _homeState.update {
                 it.copy(
@@ -161,7 +168,15 @@ class RequestViewModel @Inject constructor(
             }
             state.copy(
                 selectedCommunityFilter = communityId,
-                urgentRequests = filtered.filter { it.urgency == Urgency.CRITICAL },
+                urgentRequests = filtered.sortedWith(
+                    compareByDescending<BloodRequest> {
+                        when (it.urgency) {
+                            Urgency.CRITICAL -> 2
+                            Urgency.MODERATE -> 1
+                            Urgency.NORMAL -> 0
+                        }
+                    }.thenByDescending { it.createdAt }
+                ),
             )
         }
     }
@@ -359,8 +374,13 @@ class RequestViewModel @Inject constructor(
             _feedState.update {
                 it.copy(
                     feedRequests = feedRequests.sortedWith(
-                        compareByDescending<BloodRequest> { r -> r.urgency == Urgency.CRITICAL }
-                            .thenByDescending { r -> r.createdAt },
+                        compareByDescending<BloodRequest> { r ->
+                            when (r.urgency) {
+                                Urgency.CRITICAL -> 2
+                                Urgency.MODERATE -> 1
+                                Urgency.NORMAL -> 0
+                            }
+                        }.thenByDescending { r -> r.createdAt },
                     ),
                     myRequests = myRequests,
                     isLoading = false,
