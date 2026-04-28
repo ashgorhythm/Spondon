@@ -221,7 +221,7 @@ fun ProfileScreen(
                             QuickLinkItem(Icons.Outlined.Notifications, s.notifications, onClick = { navController.navigate(Routes.Notifications.route) })
                             QuickLinkItem(Icons.Outlined.Settings, s.settings, onClick = { navController.navigate(Routes.Settings.route) })
                             QuickLinkItem(Icons.Outlined.Info, "About", onClick = { navController.navigate(Routes.About.route) })
-                            QuickLinkItem(Icons.Filled.VolunteerActivism, "Support", onClick = { navController.navigate(Routes.Support.route) })
+                            QuickLinkItem(Icons.Filled.VolunteerActivism, s.supportDeveloper, onClick = { navController.navigate(Routes.Support.route) })
                         }
                     }
 

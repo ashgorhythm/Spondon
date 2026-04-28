@@ -22,6 +22,7 @@ import com.spondon.app.feature.notification.NotificationScreen
 import com.spondon.app.feature.profile.*
 import com.spondon.app.feature.request.*
 import com.spondon.app.feature.settings.SettingsScreen
+import com.spondon.app.feature.support.SupportScreen
 
 private val safeEnter: EnterTransition =
     fadeIn(animationSpec = tween(300, easing = LinearEasing))
@@ -186,6 +187,7 @@ fun SpondonNavGraph(
             // ─── Settings & Notifications ────────────────────
             composable(Routes.Settings.route) { SettingsScreen(navController) }
             composable(Routes.Notifications.route) { NotificationScreen(navController) }
+            composable(Routes.Support.route) { SupportScreen(navController) }
         }
     }
 }

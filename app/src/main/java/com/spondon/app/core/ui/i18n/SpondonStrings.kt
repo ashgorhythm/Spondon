@@ -112,6 +112,15 @@ data class SpondonStrings(
     val cancel: String,
     val languageChangeRestart: String,
 
+    // ─── Support Developer ──────────────
+    val supportDeveloper: String,
+    val supportDeveloperDesc: String,
+    val supportGreeting: String,
+    val supportMessage: String,
+    val supportButtonText: String,
+    val supportFooter: String,
+
+
     // ─── Notifications ──────────────────
     val markAllRead: String,
     val noNotifications: String,
@@ -268,6 +277,15 @@ val Bn = SpondonStrings(
     cancel = "বাতিল",
     languageChangeRestart = "ভাষা পরিবর্তন হয়েছে। পরিবর্তন কার্যকর হবে।",
 
+    // Support Developer
+    supportDeveloper = "সাপোর্ট করুন",
+    supportDeveloperDesc = "এই অ্যাপটি ভালো লাগলে ডেভেলপারকে সাপোর্ট করতে পারেন",
+    supportGreeting = "আসসালামু আলাইকুম! \uD83D\uDE4F",
+    supportMessage = "স্পন্দন একটি ফ্রি এবং ওপেন-সোর্স অ্যাপ যা রক্তদাতা ও রক্তপ্রার্থীদের সংযুক্ত করতে তৈরি করা হয়েছে। আপনার সাপোর্ট এই অ্যাপটিকে আরও উন্নত করতে এবং নতুন ফিচার যোগ করতে সাহায্য করবে। প্রতিটি ছোট অনুদানও অনেক বড় পরিবর্তন আনতে পারে। ❤\uFE0F",
+    supportButtonText = "সাপোর্ট করুন",
+    supportFooter = "আপনার সাপোর্টের জন্য আন্তরিক ধন্যবাদ ❤\uFE0F",
+
+
     // Notifications
     markAllRead = "সব পড়া হয়েছে",
     noNotifications = "কোনো বিজ্ঞপ্তি নেই",
@@ -423,6 +441,15 @@ val En = SpondonStrings(
     delete = "Delete",
     cancel = "Cancel",
     languageChangeRestart = "Language changed. Changes will take effect.",
+
+    // Support Developer
+    supportDeveloper = "Support Us",
+    supportDeveloperDesc = "If you find this app helpful, consider supporting the developer",
+    supportGreeting = "Assalamu Alaikum! \uD83D\uDE4F",
+    supportMessage = "Spondon is a free, open-source app built to connect blood donors with those in need. Your support helps us keep improving the app and adding new features. Every small contribution can make a big difference. ❤\uFE0F",
+    supportButtonText = "Support Now",
+    supportFooter = "Thank you so much for your kindness ❤\uFE0F",
+
 
     // Notifications
     markAllRead = "Mark all read",

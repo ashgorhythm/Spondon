@@ -1,10 +1,12 @@
 package com.spondon.app.feature.settings
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -14,12 +16,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.spondon.app.R
 import com.spondon.app.core.ui.i18n.S
+import com.spondon.app.core.ui.i18n.SpondonStrings
 import com.spondon.app.core.ui.theme.*
 import com.spondon.app.core.util.BiometricHelper
 import com.spondon.app.navigation.Routes
@@ -146,13 +151,21 @@ fun SettingsScreen(
                 // ─── Account ─────────────────────
                 item { SectionHeader(s.account) }
                 item {
-                    SettingsClickItem(Icons.Outlined.Logout, s.logout, s.logoutDesc, Color(0xFFFF9100)) {
+                    SettingsClickItem(Icons.AutoMirrored.Outlined.Logout, s.logout, s.logoutDesc, Color(0xFFFF9100)) {
                         viewModel.showLogoutDialog()
                     }
                 }
                 item {
                     SettingsClickItem(Icons.Outlined.DeleteForever, s.deleteAccount, s.deleteAccountDesc, UrgencyCritical) {
                         viewModel.showDeleteDialog()
+                    }
+                }
+
+                // ─── Support Developer ──────────────
+                item { SectionHeader(s.supportDeveloper) }
+                item {
+                    SupportDeveloperCard(s) {
+                        navController.navigate(Routes.Support.route)
                     }
                 }
 
@@ -296,6 +309,42 @@ private fun SettingsClickItem(icon: ImageVector, title: String, subtitle: String
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
             }
             Icon(Icons.Filled.ChevronRight, null, tint = accentColor.copy(alpha = 0.5f))
+        }
+    }
+}
+
+@Composable
+private fun SupportDeveloperCard(s: SpondonStrings, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = null,
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = s.supportDeveloper,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Text(
+                    text = s.supportDeveloperDesc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                )
+            }
+            Icon(
+                Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+            )
         }
     }
 }
