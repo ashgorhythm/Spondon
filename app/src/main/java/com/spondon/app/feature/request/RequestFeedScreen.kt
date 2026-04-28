@@ -51,14 +51,13 @@ fun RequestFeedScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
+            ExtendedFloatingActionButton(
                 onClick = { navController.navigate("create_request") },
                 containerColor = BloodRed,
                 contentColor = Color.White,
-                shape = RoundedCornerShape(16.dp),
-            ) {
-                Icon(Icons.Filled.Add, "Create Request")
-            }
+                text = {Text("Request")},
+                icon = {Icon(Icons.Filled.Bloodtype, "Create Request")}
+            )
         },
     ) { padding ->
         Column(

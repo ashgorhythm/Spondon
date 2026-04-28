@@ -29,7 +29,7 @@ data class BottomNavItem(
 val bottomNavItems = listOf(
     BottomNavItem("home", "home", Icons.Filled.Home, Icons.Outlined.Home),
     BottomNavItem("communities", "community_list", Icons.Filled.Groups, Icons.Outlined.Groups),
-    BottomNavItem("createRequest", "create_request", Icons.Filled.Bloodtype, Icons.Outlined.Bloodtype),
+    BottomNavItem("request_feed", "request_feed", Icons.Filled.Bloodtype, Icons.Outlined.Bloodtype),
     BottomNavItem("findDonor", "find_donor", Icons.Filled.Search, Icons.Outlined.Search),
     BottomNavItem("profile", "profile", Icons.Filled.Person, Icons.Outlined.Person),
 )
@@ -43,7 +43,7 @@ private fun resolveLabel(key: String): String {
     return when (key) {
         "home" -> s.home
         "communities" -> s.communities
-        "createRequest" -> s.createRequest
+        "request_feed" -> s.bloodRequests
         "findDonor" -> s.findDonor
         "profile" -> s.profile
         else -> key

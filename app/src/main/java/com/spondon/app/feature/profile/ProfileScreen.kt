@@ -3,6 +3,7 @@ package com.spondon.app.feature.profile
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -126,8 +127,11 @@ fun ProfileScreen(
                     // ─── Stats Row ─────────────────────────
                     item {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
                             StatItem("${user.totalDonations}", s.totalDonations, Icons.Outlined.VolunteerActivism,
                                 onClick = { navController.navigate(Routes.DonationHistory.route) }, modifier = Modifier.weight(1f))
@@ -262,7 +266,12 @@ private fun StatItem(value: String, label: String, icon: ImageVector, onClick: (
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
     ) {
-        Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
             Icon(icon, null, tint = BloodRed, modifier = Modifier.size(18.dp))
             Spacer(Modifier.height(4.dp))
             Text(value, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), maxLines = 1)
