@@ -61,6 +61,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import androidx.compose.material3.AlertDialog
+import com.spondon.app.feature.update.UpdateManager
+import com.spondon.app.feature.update.UpdateViewModel
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
@@ -71,6 +74,9 @@ class MainActivity : FragmentActivity() {
 
     // Activity-scoped ViewModel shared with all screens via hiltViewModel()
     private val authViewModel: AuthViewModel by viewModels()
+    private val updateViewModel: UpdateViewModel by viewModels()
+
+    private lateinit var updateManager: UpdateManager
 
     // ── Credential Manager (modern Google Sign-In replacement) ─
     private lateinit var credentialManager: CredentialManager
@@ -80,6 +86,10 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
 
         credentialManager = CredentialManager.create(this)
+        updateManager = UpdateManager(this)
+
+        val currentVersion = "v" + BuildConfig.VERSION_NAME
+        updateViewModel.checkForUpdates(currentVersion)
 
         // Read initial prefs synchronously (DataStore is fast for read-first)
         val initialDarkMode = runBlocking { preferencesManager.isDarkMode.first() }
@@ -127,6 +137,29 @@ class MainActivity : FragmentActivity() {
 
             CompositionLocalProvider(LocalAppLanguage provides language) {
                 SpondonTheme(darkTheme = darkMode) {
+                    val updateInfo by updateViewModel.updateInfo.collectAsState()
+
+                    updateInfo?.let { info ->
+                        AlertDialog(
+                            onDismissRequest = { updateViewModel.dismissUpdate() },
+                            title = { Text(if (language == "bn") "আপডেট উপলব্ধ" else "Update Available") },
+                            text = { Text(if (language == "bn") "ভার্সন ${info.version} ডাউনলোডের জন্য প্রস্তুত। আপনি কি আপডেট করতে চান?" else "Version ${info.version} is available. Would you like to update?") },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    updateManager.downloadUpdate(info.downloadUrl)
+                                    updateViewModel.dismissUpdate()
+                                }) {
+                                    Text(if (language == "bn") "ডাউনলোড" else "Download", color = BloodRed)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { updateViewModel.dismissUpdate() }) {
+                                    Text(if (language == "bn") "পরে" else "Later")
+                                }
+                            }
+                        )
+                    }
+
                     if (!biometricPassed && biometricEnabled && BiometricHelper.canAuthenticate(this@MainActivity)) {
                         // Biometric lock screen
                         Surface(modifier = Modifier.fillMaxSize()) {
