@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -94,7 +95,7 @@ fun AdminDashboardScreen(
                     Modifier.fillMaxSize().padding(padding),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(color = BloodRed)
+                    ContainedLoadingIndicator()
                 }
             }
             state.error != null -> {
@@ -274,10 +275,9 @@ fun AdminDashboardScreen(
                                     colors = ButtonDefaults.buttonColors(containerColor = BloodRed),
                                 ) {
                                     if (state.isBroadcasting) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(18.dp),
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                            strokeWidth = 2.dp,
+                                        LoadingIndicator(
+                                            color = Color.White,
+                                            modifier = Modifier.size(20.dp),
                                         )
                                         Spacer(Modifier.width(8.dp))
                                     } else {

@@ -84,7 +84,7 @@ fun RequestDetailScreen(
                         .padding(padding),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(color = BloodRed, strokeWidth = 2.dp)
+                    ContainedLoadingIndicator()
                 }
             }
 
@@ -342,6 +342,64 @@ fun RequestDetailScreen(
                                             Text("Mark Fulfilled")
                                         }
                                     }
+
+                                    // ── Confirm Donation per respondent ──
+                                    if (request.respondents.isNotEmpty()) {
+                                        Spacer(Modifier.height(12.dp))
+                                        Text(
+                                            "Confirm a successful donation:",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                                        )
+                                        Spacer(Modifier.height(6.dp))
+                                        request.respondents.forEach { donorId ->
+                                            var showConfirmDialog by remember { mutableStateOf(false) }
+
+                                            FilledTonalButton(
+                                                onClick = { showConfirmDialog = true },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = ButtonDefaults.filledTonalButtonColors(
+                                                    containerColor = AvailableGreen.copy(alpha = 0.12f),
+                                                    contentColor = AvailableGreen,
+                                                ),
+                                            ) {
+                                                Icon(Icons.Filled.VolunteerActivism, null, Modifier.size(18.dp))
+                                                Spacer(Modifier.width(8.dp))
+                                                Text(
+                                                    "Confirm Donation",
+                                                    fontWeight = FontWeight.SemiBold,
+                                                )
+                                            }
+                                            Spacer(Modifier.height(4.dp))
+
+                                            if (showConfirmDialog) {
+                                                AlertDialog(
+                                                    onDismissRequest = { showConfirmDialog = false },
+                                                    confirmButton = {
+                                                        Button(
+                                                            onClick = {
+                                                                viewModel.confirmDonation(donorId)
+                                                                showConfirmDialog = false
+                                                            },
+                                                            colors = ButtonDefaults.buttonColors(containerColor = AvailableGreen),
+                                                        ) {
+                                                            Text("Confirm")
+                                                        }
+                                                    },
+                                                    dismissButton = {
+                                                        TextButton(onClick = { showConfirmDialog = false }) {
+                                                            Text("Cancel")
+                                                        }
+                                                    },
+                                                    title = { Text("Confirm Donation") },
+                                                    text = { Text("Are you sure this donor has successfully donated? This will update their donation count and mark this request as fulfilled.") },
+                                                    icon = { Icon(Icons.Filled.VolunteerActivism, null, tint = AvailableGreen) },
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
 
@@ -385,11 +443,11 @@ fun RequestDetailScreen(
                                     enabled = !state.isResponding,
                                 ) {
                                     if (state.isResponding) {
-                                        CircularProgressIndicator(
+                                        LoadingIndicator(
                                             color = Color.White,
-                                            strokeWidth = 2.dp,
                                             modifier = Modifier.size(20.dp),
                                         )
+                                        Spacer(Modifier.width(8.dp))
                                     } else {
                                         Icon(Icons.Filled.VolunteerActivism, null)
                                         Spacer(Modifier.width(8.dp))

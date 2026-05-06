@@ -351,7 +351,8 @@ class RequestViewModel @Inject constructor(
     }
 
     fun respondToRequest() {
-        val requestId = _detailState.value.request?.id ?: return
+        val request = _detailState.value.request ?: return
+        val requestId = request.id
         viewModelScope.launch {
             _detailState.update { it.copy(isResponding = true) }
             when (val result = requestRepository.respondToRequest(requestId, currentUserId)) {
@@ -363,6 +364,23 @@ class RequestViewModel @Inject constructor(
                             request = it.request?.copy(
                                 respondents = it.request.respondents + currentUserId,
                             ),
+                        )
+                    }
+
+                    // ── Notify the requester that a donor accepted ──
+                    if (request.requesterId != currentUserId) {
+                        val donorResult = userRepository.getUser(currentUserId)
+                        val donor = (donorResult as? Resource.Success)?.data
+                        val donorName = donor?.name ?: "A donor"
+                        val donorPhone = donor?.phone ?: ""
+                        val contactInfo = if (donorPhone.isNotEmpty()) " (📞 $donorPhone)" else ""
+
+                        notificationRepository.sendNotificationToUsers(
+                            userIds = listOf(request.requesterId),
+                            type = NotificationType.DONATION,
+                            title = "🩸 Someone Accepted Your Request!",
+                            body = "$donorName has responded to your ${request.bloodGroup} blood request at ${request.hospital}$contactInfo. Tap to view.",
+                            deepLink = "request_detail/$requestId",
                         )
                     }
                 }
@@ -384,6 +402,45 @@ class RequestViewModel @Inject constructor(
                     }
                 }
                 else -> {}
+            }
+        }
+    }
+
+    /**
+     * Confirm that a specific respondent has successfully donated.
+     * Updates the donor's totalDonations + lastDonationDate, marks request fulfilled,
+     * and sends a notification to the donor.
+     * Can be called by the requester, community moderator, or admin.
+     */
+    fun confirmDonation(donorUserId: String) {
+        val request = _detailState.value.request ?: return
+        viewModelScope.launch {
+            try {
+                // 1. Update donor's profile
+                val donorResult = userRepository.getUser(donorUserId)
+                val donor = (donorResult as? Resource.Success)?.data ?: return@launch
+                val updatedDonor = donor.copy(
+                    totalDonations = donor.totalDonations + 1,
+                    lastDonationDate = Date(),
+                )
+                userRepository.updateUser(updatedDonor)
+
+                // 2. Mark request as fulfilled
+                requestRepository.updateRequestStatus(request.id, RequestStatus.FULFILLED)
+                _detailState.update {
+                    it.copy(request = it.request?.copy(status = RequestStatus.FULFILLED))
+                }
+
+                // 3. Notify the donor
+                notificationRepository.sendNotificationToUsers(
+                    userIds = listOf(donorUserId),
+                    type = NotificationType.DONATION,
+                    title = "🎉 Donation Confirmed!",
+                    body = "Your blood donation for ${request.bloodGroup} at ${request.hospital} has been confirmed. Thank you for saving a life!",
+                    deepLink = "request_detail/${request.id}",
+                )
+            } catch (_: Exception) {
+                // silently fail — don't block UI
             }
         }
     }

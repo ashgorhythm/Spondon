@@ -255,7 +255,7 @@ fun FindDonorScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        CircularProgressIndicator(color = BloodRed, strokeWidth = 2.dp)
+                        ContainedLoadingIndicator()
                     }
                 }
 

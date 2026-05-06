@@ -69,7 +69,7 @@ fun NotificationScreen(
         when {
             state.isLoading -> {
                 Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = BloodRed, strokeWidth = 2.dp)
+                    ContainedLoadingIndicator()
                 }
             }
 

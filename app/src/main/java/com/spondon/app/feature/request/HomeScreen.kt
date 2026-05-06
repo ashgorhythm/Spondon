@@ -34,13 +34,16 @@ import com.spondon.app.core.domain.model.Urgency
 import com.spondon.app.core.ui.i18n.S
 import com.spondon.app.core.ui.theme.*
 import com.spondon.app.navigation.Routes
+import com.spondon.app.feature.notification.NotificationViewModel
 
 @Composable
 fun HomeScreen(
     navController: NavController,
     viewModel: RequestViewModel = hiltViewModel(),
+    notificationViewModel: NotificationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.homeState.collectAsState()
+    val notificationState by notificationViewModel.state.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.loadHome() }
 
@@ -81,9 +84,9 @@ fun HomeScreen(
                 ) {
                     BadgedBox(
                         badge = {
-                            if (state.pendingRequests > 0) {
+                            if (notificationState.unreadCount > 0) {
                                 Badge(containerColor = BloodRed) {
-                                    Text("${state.pendingRequests}", color = Color.White, fontSize = 10.sp)
+                                    Text("${notificationState.unreadCount}", color = Color.White, fontSize = 10.sp)
                                 }
                             }
                         },
@@ -301,7 +304,7 @@ fun HomeScreen(
                         .height(120.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(color = BloodRed, strokeWidth = 2.dp)
+                    ContainedLoadingIndicator()
                 }
             }
         } else if (state.urgentRequests.isEmpty()) {

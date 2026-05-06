@@ -2,6 +2,7 @@ package com.spondon.app.core.ui.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -35,10 +36,9 @@ fun SpondonButton(
             ),
         ) {
             if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
+                LoadingIndicator(
                     color = BloodRed,
+                    modifier = Modifier.size(18.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
             }
@@ -66,9 +66,8 @@ fun SpondonButton(
             ),
         ) {
             if (isLoading) {
-                CircularProgressIndicator(
+                LoadingIndicator(
                     modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
                 Spacer(modifier = Modifier.width(8.dp))

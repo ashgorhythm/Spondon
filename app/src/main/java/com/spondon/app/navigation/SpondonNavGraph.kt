@@ -17,6 +17,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.spondon.app.core.ui.components.SpondonBottomNav
 import com.spondon.app.core.ui.components.bottomNavItems
 import com.spondon.app.feature.auth.*
+import com.spondon.app.feature.auth.PermissionsScreen
 import com.spondon.app.feature.community.*
 import com.spondon.app.feature.donor.*
 import com.spondon.app.feature.notification.NotificationScreen
@@ -143,6 +144,9 @@ fun SpondonNavGraph(
                 }
                 composable(Routes.ForgotPassword.route) {
                     ForgotPasswordScreen(navController, authViewModel)
+                }
+                composable(Routes.Permissions.route) {
+                    PermissionsScreen(navController)
                 }
             }
 

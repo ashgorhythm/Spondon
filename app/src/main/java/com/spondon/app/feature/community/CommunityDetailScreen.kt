@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Feed
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -60,6 +61,7 @@ fun CommunityDetailScreen(
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    var fabExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -71,6 +73,98 @@ fun CommunityDetailScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            val isAdminOrMod = state.currentUserRole == CommunityRole.ADMIN ||
+                    state.currentUserRole == CommunityRole.MODERATOR
+            if (isAdminOrMod && state.community != null) {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    // ── Expanded FAB items ──
+                    AnimatedVisibility(
+                        visible = fabExpanded,
+                        enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
+                        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom),
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.End,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(bottom = 12.dp),
+                        ) {
+                            // Admin Dashboard
+                            SmallFloatingActionButton(
+                                onClick = {
+                                    fabExpanded = false
+                                    navController.navigate("admin_dashboard/$communityId")
+                                },
+                                containerColor = BloodRed,
+                                contentColor = Color.White,
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(Icons.Default.AdminPanelSettings, null, Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Dashboard", style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+
+                            // Broadcast Message
+                            SmallFloatingActionButton(
+                                onClick = {
+                                    fabExpanded = false
+                                    // Navigate to admin dashboard - broadcast tab
+                                    navController.navigate("admin_dashboard/$communityId")
+                                },
+                                containerColor = PendingAmber,
+                                contentColor = Color.White,
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(Icons.Default.Campaign, null, Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Broadcast", style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+
+                            // Manage Members
+                            SmallFloatingActionButton(
+                                onClick = {
+                                    fabExpanded = false
+                                    navController.navigate("admin_dashboard/$communityId")
+                                },
+                                containerColor = SoftRose,
+                                contentColor = Color.White,
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(Icons.Default.Group, null, Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Members", style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Main FAB ──
+                    FloatingActionButton(
+                        onClick = { fabExpanded = !fabExpanded },
+                        containerColor = BloodRed,
+                        contentColor = Color.White,
+                    ) {
+                        Icon(
+                            imageVector = if (fabExpanded) Icons.Default.Close else Icons.Default.AdminPanelSettings,
+                            contentDescription = "Admin Actions",
+                        )
+                    }
+                }
+            }
+        },
     ) { padding ->
         when {
             state.isLoading -> {
@@ -78,7 +172,7 @@ fun CommunityDetailScreen(
                     Modifier.fillMaxSize().padding(padding),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(color = BloodRed)
+                    ContainedLoadingIndicator()
                 }
             }
             state.error != null -> {
@@ -290,20 +384,6 @@ fun CommunityDetailScreen(
                                     }
                                 }
                             }
-
-                            // Admin panel button
-                            if (state.currentUserRole == CommunityRole.ADMIN ||
-                                state.currentUserRole == CommunityRole.MODERATOR
-                            ) {
-                                FilledTonalButton(
-                                    onClick = { navController.navigate("admin_dashboard/$communityId") },
-                                    shape = RoundedCornerShape(12.dp),
-                                ) {
-                                    Icon(Icons.Default.AdminPanelSettings, contentDescription = null, Modifier.size(18.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Admin")
-                                }
-                            }
                         }
                     }
 
@@ -346,7 +426,7 @@ fun CommunityDetailScreen(
                                 ) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Icon(
-                                            Icons.Default.Feed,
+                                            Icons.AutoMirrored.Filled.Feed,
                                             contentDescription = null,
                                             modifier = Modifier.size(48.dp),
                                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),

@@ -34,7 +34,8 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -214,7 +215,7 @@ fun LocationSetupScreen(
                 enabled = !isLocating,
             ) {
                 if (isLocating) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = BloodRed, strokeWidth = 2.dp)
+                    LoadingIndicator(modifier = Modifier.size(20.dp), color = BloodRed)
                     Spacer(modifier = Modifier.width(12.dp))
                     Text("Detecting location...")
                 } else {
@@ -451,7 +452,7 @@ fun LocationSetupScreen(
                     .background(Color.Black.copy(alpha = 0.4f)),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator(color = BloodRed)
+                ContainedLoadingIndicator()
             }
         }
     }

@@ -613,10 +613,11 @@ class FirestoreService @Inject constructor(
 
     suspend fun createNotification(userId: String, data: Map<String, Any?>): Resource<String> {
         return try {
-            val docRef = firestore.collection(Constants.USERS_COLLECTION)
-                .document(userId)
-                .collection(Constants.NOTIFICATIONS_COLLECTION)
-                .add(data)
+            // Ensure userId is included in the data for the top-level collection
+            val notifData = data.toMutableMap()
+            notifData["userId"] = userId
+            val docRef = firestore.collection(Constants.NOTIFICATIONS_COLLECTION)
+                .add(notifData)
                 .await()
             Resource.Success(docRef.id)
         } catch (e: Exception) {

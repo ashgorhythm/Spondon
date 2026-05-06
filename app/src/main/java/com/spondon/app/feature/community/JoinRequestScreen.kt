@@ -89,7 +89,7 @@ fun JoinRequestScreen(
                     Modifier.fillMaxSize().padding(padding),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(color = BloodRed)
+                    ContainedLoadingIndicator()
                 }
             }
             state.community != null -> {

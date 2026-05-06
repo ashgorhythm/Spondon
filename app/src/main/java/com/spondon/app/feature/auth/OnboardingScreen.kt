@@ -81,7 +81,7 @@ fun OnboardingScreen(
         TextButton(
             onClick = {
                 viewModel.completeOnboarding()
-                navController.navigate(Routes.Login.route) {
+                navController.navigate(Routes.Permissions.route) {
                     popUpTo(Routes.Onboarding.route) { inclusive = true }
                 }
             },
@@ -140,7 +140,7 @@ fun OnboardingScreen(
                 onClick = {
                     if (isLastPage) {
                         viewModel.completeOnboarding()
-                        navController.navigate(Routes.Login.route) {
+                        navController.navigate(Routes.Permissions.route) {
                             popUpTo(Routes.Onboarding.route) { inclusive = true }
                         }
                     } else {

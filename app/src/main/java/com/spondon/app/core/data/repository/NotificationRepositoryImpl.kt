@@ -61,7 +61,10 @@ class NotificationRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Creates a notification document in Firestore.
+     * Creates a notification in the top-level `notifications` collection.
+     * The `userId` field is used by [getNotifications] and [observeUnreadCount]
+     * to query notifications for a specific user.
+     *
      * Used by [SpondonFCMService] and for in-app trigger events.
      */
     suspend fun createNotification(

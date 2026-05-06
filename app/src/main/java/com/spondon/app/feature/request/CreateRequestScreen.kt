@@ -359,11 +359,11 @@ fun CreateRequestScreen(
                     enabled = !state.isSubmitting,
                 ) {
                     if (state.isSubmitting) {
-                        CircularProgressIndicator(
+                        LoadingIndicator(
                             color = Color.White,
-                            strokeWidth = 2.dp,
                             modifier = Modifier.size(20.dp),
                         )
+                        Spacer(Modifier.width(8.dp))
                     } else {
                         @Suppress("DEPRECATION")
                         Icon(Icons.Filled.Send, null)
@@ -371,7 +371,6 @@ fun CreateRequestScreen(
                         Text(
                             "Post Request",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
                         )
                     }
                 }
