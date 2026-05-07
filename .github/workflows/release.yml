@@ -5,6 +5,12 @@ on:
     tags:
       - 'v*' 
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -24,7 +30,9 @@ jobs:
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystore.jks
 
       - name: Build signed release APK
-        run: ./gradlew assembleRelease
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease
         env:
           STORE_FILE: keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
@@ -34,4 +42,4 @@ jobs:
       - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/Spondon v*.apk
+          files: "app/build/outputs/apk/release/Spondon v*.apk"
