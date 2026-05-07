@@ -558,9 +558,19 @@ fun RequestCard(
 
                 // Info Column
                 Column(modifier = Modifier.weight(1f)) {
-                    // Hospital name — primary text
+                    if (request.communityName.isNotBlank()) {
+                        Text(
+                            text = request.communityName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                    }
+                    // Requester name — primary text
                     Text(
-                        text = request.hospital.ifBlank { "Hospital not specified" },
+                        text = request.requesterName.ifBlank { request.patientName ?: "Unknown Requester" },
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.Bold,
                         ),
@@ -621,7 +631,7 @@ fun RequestCard(
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        text = request.address.ifBlank { request.hospital.take(15) },
+                        text = request.hospital.ifBlank { "Unknown Hospital" },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                         maxLines = 1,

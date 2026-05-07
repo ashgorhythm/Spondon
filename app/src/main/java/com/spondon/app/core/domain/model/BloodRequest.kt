@@ -10,6 +10,8 @@ data class BloodRequest(
     val urgency: Urgency = Urgency.NORMAL,
     val unitsNeeded: Int = 1,
     val patientName: String? = null,
+    val requesterName: String = "",
+    val communityName: String = "",
     val hospital: String = "",
     val address: String = "",
     val donationDateTime: Date? = null,

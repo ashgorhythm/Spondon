@@ -259,6 +259,13 @@ class RequestViewModel @Inject constructor(
                 cal.time
             }
 
+            // Fetch requester name and community name
+            val userResult = userRepository.getUser(currentUserId)
+            val requesterName = (userResult as? Resource.Success)?.data?.name ?: "Unknown"
+
+            val firstCommunityId = state.selectedCommunityIds.firstOrNull()
+            val communityName = state.availableCommunities.find { it.id == firstCommunityId }?.name ?: ""
+
             val request = BloodRequest(
                 communityIds = state.selectedCommunityIds,
                 requesterId = currentUserId,
@@ -266,6 +273,8 @@ class RequestViewModel @Inject constructor(
                 urgency = state.urgency,
                 unitsNeeded = state.unitsNeeded,
                 patientName = state.patientName,
+                requesterName = requesterName,
+                communityName = communityName,
                 address = state.address,
                 hospital = state.hospital,
                 donationDateTime = state.donationDate,
