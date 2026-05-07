@@ -7,6 +7,16 @@ plugins {
     alias(libs.plugins.google.services) // Firebase — google-services.json is present
 }
 
+// Read GitHub token: env var (CI) or local.properties (local dev)
+val githubToken: String = System.getenv("GITHUB_TOKEN")
+    ?: rootProject.file("local.properties")
+        .takeIf { it.exists() }
+        ?.readLines()
+        ?.firstOrNull { it.startsWith("GITHUB_TOKEN=") }
+        ?.substringAfter("=")
+        ?.trim()
+    ?: ""
+
 android {
     namespace = "com.spondon.app"
     compileSdk = 37
@@ -15,9 +25,10 @@ android {
         applicationId = "com.spondon.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 8
-        versionName = "1.0.7"
+        versionCode = 9
+        versionName = "1.0.8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "GITHUB_TOKEN", "\"${githubToken}\"")
     }
 
     signingConfigs {

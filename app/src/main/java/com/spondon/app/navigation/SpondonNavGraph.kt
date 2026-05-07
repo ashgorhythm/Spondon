@@ -23,11 +23,13 @@ import com.spondon.app.feature.donor.*
 import com.spondon.app.feature.notification.NotificationScreen
 import com.spondon.app.feature.profile.*
 import com.spondon.app.feature.request.*
+import com.spondon.app.feature.settings.AboutScreen
 import com.spondon.app.feature.settings.SecuritySettingsScreen
 import com.spondon.app.feature.settings.SettingsScreen
 import com.spondon.app.feature.superadmin.auth.BannedScreen
 import com.spondon.app.feature.superadmin.superAdminGraph
 import com.spondon.app.feature.support.SupportScreen
+import com.spondon.app.feature.update.UpdateInfo
 import kotlinx.coroutines.tasks.await
 
 private val safeEnter: EnterTransition =
@@ -41,6 +43,14 @@ fun SpondonNavGraph(
     authViewModel: AuthViewModel,
     onGoogleSignIn: () -> Unit = {},
     onSendOtp: (String) -> Unit = {},
+    // Update-related
+    updateAvailable: UpdateInfo? = null,
+    isCheckingUpdate: Boolean = false,
+    isUpToDate: Boolean? = null,
+    onCheckForUpdate: () -> Unit = {},
+    onDownloadUpdate: (String) -> Unit = {},
+    onDismissUpdate: () -> Unit = {},
+    onClearUpToDate: () -> Unit = {},
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -210,6 +220,18 @@ fun SpondonNavGraph(
             composable(Routes.SecuritySettings.route) { SecuritySettingsScreen(navController) }
             composable(Routes.Notifications.route) { NotificationScreen(navController) }
             composable(Routes.Support.route) { SupportScreen(navController) }
+            composable(Routes.About.route) {
+                AboutScreen(
+                    navController = navController,
+                    updateAvailable = updateAvailable,
+                    isCheckingUpdate = isCheckingUpdate,
+                    isUpToDate = isUpToDate,
+                    onCheckForUpdate = onCheckForUpdate,
+                    onDownloadUpdate = onDownloadUpdate,
+                    onDismissUpdate = onDismissUpdate,
+                    onClearUpToDate = onClearUpToDate,
+                )
+            }
 
             // ─── Ban Gate ─────────────────────────────────────
             composable("banned/{reason}") { entry ->

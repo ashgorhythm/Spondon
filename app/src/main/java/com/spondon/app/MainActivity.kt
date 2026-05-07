@@ -91,8 +91,7 @@ class MainActivity : FragmentActivity() {
         updateManager = UpdateManager(this)
         notificationObserver = NotificationObserver(this)
 
-        val currentVersion = "v" + BuildConfig.VERSION_NAME
-        updateViewModel.checkForUpdates(currentVersion)
+        updateViewModel.checkForUpdates(BuildConfig.VERSION_NAME)
 
         // Read initial prefs synchronously (DataStore is fast for read-first)
         val initialDarkMode = runBlocking { preferencesManager.isDarkMode.first() }
@@ -141,22 +140,39 @@ class MainActivity : FragmentActivity() {
             CompositionLocalProvider(LocalAppLanguage provides language) {
                 SpondonTheme(darkTheme = darkMode) {
                     val updateInfo by updateViewModel.updateInfo.collectAsState()
+                    val isCheckingUpdate by updateViewModel.isChecking.collectAsState()
+                    val isUpToDate by updateViewModel.isUpToDate.collectAsState()
 
-                    updateInfo?.let { info ->
+                    // Startup auto-check dialog — only shown once on launch
+                    var startupDialogShown by remember { mutableStateOf(false) }
+                    if (!startupDialogShown && updateInfo != null) {
+                        val info = updateInfo!!
                         AlertDialog(
-                            onDismissRequest = { updateViewModel.dismissUpdate() },
+                            onDismissRequest = {
+                                startupDialogShown = true
+                                updateViewModel.dismissUpdate()
+                            },
                             title = { Text(if (language == "bn") "আপডেট উপলব্ধ" else "Update Available") },
-                            text = { Text(if (language == "bn") "ভার্সন ${info.version} ডাউনলোডের জন্য প্রস্তুত। আপনি কি আপডেট করতে চান?" else "Version ${info.version} is available. Would you like to update?") },
+                            text = {
+                                Text(
+                                    if (language == "bn") "ভার্সন ${info.version} ডাউনলোডের জন্য প্রস্তুত। আপনি কি আপডেট করতে চান?"
+                                    else "Version ${info.version} is available. Would you like to update?"
+                                )
+                            },
                             confirmButton = {
                                 TextButton(onClick = {
                                     updateManager.downloadUpdate(info.downloadUrl)
+                                    startupDialogShown = true
                                     updateViewModel.dismissUpdate()
                                 }) {
                                     Text(if (language == "bn") "ডাউনলোড" else "Download", color = BloodRed)
                                 }
                             },
                             dismissButton = {
-                                TextButton(onClick = { updateViewModel.dismissUpdate() }) {
+                                TextButton(onClick = {
+                                    startupDialogShown = true
+                                    updateViewModel.dismissUpdate()
+                                }) {
                                     Text(if (language == "bn") "পরে" else "Later")
                                 }
                             }
@@ -231,6 +247,18 @@ class MainActivity : FragmentActivity() {
                                 authViewModel = authViewModel,
                                 onGoogleSignIn = { launchGoogleSignIn() },
                                 onSendOtp = { phone -> sendOtp(phone) },
+                                updateAvailable = updateInfo,
+                                isCheckingUpdate = isCheckingUpdate,
+                                isUpToDate = isUpToDate,
+                                onCheckForUpdate = {
+                                    updateViewModel.checkForUpdates(BuildConfig.VERSION_NAME)
+                                },
+                                onDownloadUpdate = { url ->
+                                    updateManager.downloadUpdate(url)
+                                    updateViewModel.dismissUpdate()
+                                },
+                                onDismissUpdate = { updateViewModel.dismissUpdate() },
+                                onClearUpToDate = { updateViewModel.clearUpToDateFlag() },
                             )
                         }
                     }

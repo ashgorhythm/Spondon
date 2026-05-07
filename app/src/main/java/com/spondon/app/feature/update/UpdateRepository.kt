@@ -1,48 +1,113 @@
 package com.spondon.app.feature.update
 
+import android.util.Log
+import com.spondon.app.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class UpdateRepository @Inject constructor() {
 
-    suspend fun checkGitHubForUpdate(currentVersion: String): UpdateInfo? {
+    companion object {
+        private const val TAG = "UpdateRepository"
+        private const val RELEASES_URL =
+            "https://api.github.com/repos/ashanokoji/Spondon/releases/latest"
+    }
+
+    /**
+     * Checks GitHub for a newer release.
+     *
+     * @param currentVersionName The app's current version name (e.g. "1.0.7").
+     *        The leading "v" is stripped automatically.
+     * @return [UpdateInfo] if a newer version is found, `null` otherwise.
+     */
+    suspend fun checkGitHubForUpdate(currentVersionName: String): UpdateInfo? {
         return withContext(Dispatchers.IO) {
             try {
-                val url = URL("https://api.github.com/repos/ashanokoji/Spondon/releases/latest")
+                val url = URL(RELEASES_URL)
                 val connection = url.openConnection() as HttpURLConnection
                 connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
-                // A timeout prevents hanging
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
+                connection.setRequestProperty("User-Agent", "Spondon-Android-App")
 
-                if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                // Authenticate for private repo access
+                val token = BuildConfig.GITHUB_TOKEN
+                if (token.isNotBlank()) {
+                    connection.setRequestProperty("Authorization", "Bearer $token")
+                }
+
+                connection.connectTimeout = 15_000
+                connection.readTimeout = 15_000
+
+                val responseCode = connection.responseCode
+                Log.d(TAG, "GitHub API response code: $responseCode")
+
+                if (responseCode == HttpURLConnection.HTTP_OK) {
                     val response = connection.inputStream.bufferedReader().readText()
                     val json = JSONObject(response)
-                    val latestVersion = json.getString("tag_name") // e.g. "v1.0.0"
 
-                    // Use proper version comparison or simple string mismatch for now
-                    // To be safe, let's just use string mismatch as per the guide.
-                    if (latestVersion != currentVersion) {
-                        val assets = json.getJSONArray("assets")
+                    val tagName = json.optString("tag_name", "") // e.g. "v1.0.8"
+                    val releaseNotes = json.optString("body", "")
 
-                        val apkUrl = (0 until assets.length())
-                            .map { assets.getJSONObject(it) }
-                            .firstOrNull { it.getString("name").endsWith(".apk") }
-                            ?.getString("browser_download_url")
+                    val remoteVersion = tagName.removePrefix("v").trim()
+                    val localVersion = currentVersionName.removePrefix("v").trim()
+
+                    Log.d(TAG, "Remote: $remoteVersion | Local: $localVersion")
+
+                    if (isNewerVersion(remoteVersion, localVersion)) {
+                        val assets = json.optJSONArray("assets")
+                        val apkUrl = if (assets != null) {
+                            (0 until assets.length())
+                                .map { assets.getJSONObject(it) }
+                                .firstOrNull { it.getString("name").endsWith(".apk") }
+                                ?.getString("browser_download_url")
+                        } else null
 
                         if (apkUrl != null) {
-                            return@withContext UpdateInfo(latestVersion, apkUrl)
+                            Log.d(TAG, "Update available: $remoteVersion → $apkUrl")
+                            return@withContext UpdateInfo(
+                                version = remoteVersion,
+                                downloadUrl = apkUrl,
+                                releaseNotes = releaseNotes
+                            )
+                        } else {
+                            Log.w(TAG, "Newer version found but no APK asset attached")
                         }
+                    } else {
+                        Log.d(TAG, "App is up to date")
                     }
+                } else {
+                    val errorBody = try {
+                        connection.errorStream?.bufferedReader()?.readText() ?: "no error body"
+                    } catch (_: Exception) { "unreadable" }
+                    Log.w(TAG, "GitHub API returned $responseCode: $errorBody")
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e(TAG, "Update check failed", e)
             }
             return@withContext null
         }
+    }
+
+    /**
+     * Semantic version comparison.
+     * Returns `true` if [remote] is strictly newer than [local].
+     */
+    private fun isNewerVersion(remote: String, local: String): Boolean {
+        val remoteParts = remote.split(".").mapNotNull { it.toIntOrNull() }
+        val localParts = local.split(".").mapNotNull { it.toIntOrNull() }
+
+        val maxLen = maxOf(remoteParts.size, localParts.size)
+        for (i in 0 until maxLen) {
+            val r = remoteParts.getOrElse(i) { 0 }
+            val l = localParts.getOrElse(i) { 0 }
+            if (r > l) return true
+            if (r < l) return false
+        }
+        return false // equal
     }
 }
