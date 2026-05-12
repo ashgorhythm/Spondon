@@ -44,3 +44,6 @@ gradle-dist.zip
 *.aab
 *.keystore
 *.jks
+/.zed
+/.claude
+/.github
