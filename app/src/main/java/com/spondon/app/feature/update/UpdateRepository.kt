@@ -60,12 +60,24 @@ class UpdateRepository @Inject constructor() {
 
                     if (isNewerVersion(remoteVersion, localVersion)) {
                         val assets = json.optJSONArray("assets")
-                        val apkUrl = if (assets != null) {
-                            (0 until assets.length())
-                                .map { assets.getJSONObject(it) }
-                                .firstOrNull { it.getString("name").endsWith(".apk") }
-                                ?.getString("browser_download_url")
-                        } else null
+                        Log.d(TAG, "Assets count: ${assets?.length() ?: 0}")
+
+                        var apkUrl: String? = null
+                        if (assets != null) {
+                            for (i in 0 until assets.length()) {
+                                val asset = assets.getJSONObject(i)
+                                val assetName = asset.optString("name", "")
+                                val browserUrl = asset.optString("browser_download_url", "")
+                                val apiUrl = asset.optString("url", "") // API URL for authenticated download
+                                Log.d(TAG, "Asset[$i]: name=$assetName, browserUrl=$browserUrl, apiUrl=$apiUrl")
+
+                                if (assetName.endsWith(".apk")) {
+                                    // Prefer browser_download_url — UpdateManager handles auth
+                                    apkUrl = browserUrl.ifBlank { null }
+                                    break
+                                }
+                            }
+                        }
 
                         if (apkUrl != null) {
                             Log.d(TAG, "Update available: $remoteVersion → $apkUrl")
@@ -75,7 +87,7 @@ class UpdateRepository @Inject constructor() {
                                 releaseNotes = releaseNotes
                             )
                         } else {
-                            Log.w(TAG, "Newer version found but no APK asset attached")
+                            Log.w(TAG, "Newer version found but no APK asset attached to release")
                         }
                     } else {
                         Log.d(TAG, "App is up to date")
