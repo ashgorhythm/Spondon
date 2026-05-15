@@ -11,6 +11,9 @@ import com.spondon.app.feature.superadmin.broadcast.SABroadcastScreen
 import com.spondon.app.feature.superadmin.community.SACommunityDetailScreen
 import com.spondon.app.feature.superadmin.community.SACommunityListScreen
 import com.spondon.app.feature.superadmin.dashboard.SADashboardScreen
+import com.spondon.app.feature.superadmin.feedback.SAFeedbackScreen
+import com.spondon.app.feature.superadmin.forceupdate.SAForceUpdateScreen
+import com.spondon.app.feature.superadmin.maintenance.SAMaintenanceScreen
 import com.spondon.app.feature.superadmin.users.SAUserDetailScreen
 import com.spondon.app.feature.superadmin.users.SAUserListScreen
 
@@ -25,11 +28,10 @@ fun NavGraphBuilder.superAdminGraph(
     navController: NavController,
     isSARegistered: Boolean,
 ) {
-    // Registration — self-destructing route (only if no SA exists yet)
-    if (!isSARegistered) {
-        composable("sa_register") {
-            SuperAdminRegisterScreen(navController)
-        }
+    // Registration — available at the route level always;
+    // the LoginScreen redirects here only when Firestore says no SA exists.
+    composable("sa_register") {
+        SuperAdminRegisterScreen(navController)
     }
 
     // Login — accessible via hidden deep link, not from any UI
@@ -73,8 +75,21 @@ fun NavGraphBuilder.superAdminGraph(
         SABroadcastScreen(navController)
     }
 
-    // ─── Phase 4+: Additional screens will be registered here ──
-    // composable("sa_feedback")    { SAFeedbackScreen(navController) }
+    // ─── Phase 4: Feedback ───────────────────────────────────
+    composable("sa_feedback") {
+        SAFeedbackScreen(navController)
+    }
+
+    // ─── Phase 4: Maintenance Mode ──────────────────────────
+    composable("sa_maintenance") {
+        SAMaintenanceScreen(navController)
+    }
+
+    // ─── Phase 4: Force Update ───────────────────────────────
+    composable("sa_force_update") {
+        SAForceUpdateScreen(navController)
+    }
+
+    // ─── Phase 5: Analytics (future) ─────────────────────────
     // composable("sa_analytics")   { SAAnalyticsScreen(navController) }
-    // composable("sa_maintenance") { SAMaintenanceScreen(navController) }
 }

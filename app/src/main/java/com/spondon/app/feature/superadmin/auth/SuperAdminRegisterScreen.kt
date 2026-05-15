@@ -37,6 +37,15 @@ fun SuperAdminRegisterScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
+    // Self-destruct: if SA is already registered, redirect to login
+    LaunchedEffect(state.isInitialized, state.isRegistered, state.registrationComplete) {
+        if (state.isInitialized && state.isRegistered && !state.registrationComplete) {
+            navController.navigate("sa_login") {
+                popUpTo("sa_register") { inclusive = true }
+            }
+        }
+    }
+
     // Navigate to SA Dashboard on successful registration
     LaunchedEffect(state.registrationComplete) {
         if (state.registrationComplete) {

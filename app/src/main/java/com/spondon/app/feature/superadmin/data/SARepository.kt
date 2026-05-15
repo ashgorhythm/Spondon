@@ -7,6 +7,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.spondon.app.core.common.Resource
 import com.spondon.app.feature.superadmin.broadcast.*
 import com.spondon.app.feature.superadmin.community.*
+import com.spondon.app.feature.superadmin.feedback.*
+import com.spondon.app.feature.superadmin.forceupdate.*
+import com.spondon.app.feature.superadmin.maintenance.*
 import com.spondon.app.feature.superadmin.users.*
 import kotlinx.coroutines.tasks.await
 import java.security.MessageDigest
@@ -632,6 +635,189 @@ class SARepository @Inject constructor(
             Resource.Success(items)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to load history", e)
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // Feedback (Phase 4)
+    // ════════════════════════════════════════════════════════════
+
+    /** Fetch all user feedback from Firestore. */
+    suspend fun getAllFeedback(): Resource<List<SAFeedbackItem>> {
+        return try {
+            val snapshot = firestore.collection("feedback")
+                .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .get().await()
+            val items = snapshot.documents.mapNotNull { doc ->
+                val data = doc.data ?: return@mapNotNull null
+                val createdAt = when (val d = data["createdAt"]) {
+                    is Timestamp -> d.toDate()
+                    is Date -> d
+                    else -> null
+                }
+                SAFeedbackItem(
+                    id = doc.id,
+                    userId = data["userId"] as? String ?: "",
+                    userName = data["userName"] as? String ?: "",
+                    type = data["type"] as? String ?: "OTHER",
+                    body = data["body"] as? String ?: "",
+                    screenshotUrl = data["screenshotUrl"] as? String,
+                    appVersion = data["appVersion"] as? String ?: "",
+                    deviceModel = data["deviceModel"] as? String ?: "",
+                    osVersion = data["osVersion"] as? String ?: "",
+                    status = data["status"] as? String ?: "UNREAD",
+                    createdAt = createdAt,
+                )
+            }
+            Resource.Success(items)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to load feedback", e)
+        }
+    }
+
+    /** Update feedback status (READ, RESOLVED, SPAM). */
+    suspend fun updateFeedbackStatus(feedbackId: String, status: String): Resource<Unit> {
+        return try {
+            firestore.collection("feedback").document(feedbackId)
+                .update("status", status).await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Update failed", e)
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // Maintenance Mode (Phase 4)
+    // ════════════════════════════════════════════════════════════
+
+    /** Fetch the full maintenance config. */
+    suspend fun getMaintenanceConfig(): Resource<MaintenanceConfig> {
+        return try {
+            val doc = firestore.document("config/maintenance").get().await()
+            val data = doc.data
+            if (data == null) {
+                Resource.Success(MaintenanceConfig())
+            } else {
+                val enabledAt = when (val d = data["enabledAt"]) {
+                    is Timestamp -> d.toDate()
+                    is Date -> d
+                    else -> null
+                }
+                val estimatedEnd = when (val d = data["estimatedEnd"]) {
+                    is Timestamp -> d.toDate()
+                    is Date -> d
+                    else -> null
+                }
+                Resource.Success(
+                    MaintenanceConfig(
+                        isEnabled = data["isEnabled"] as? Boolean ?: false,
+                        title = data["title"] as? String ?: "",
+                        message = data["message"] as? String ?: "",
+                        estimatedEnd = estimatedEnd,
+                        enabledAt = enabledAt,
+                        enabledBy = data["enabledBy"] as? String ?: "",
+                    ),
+                )
+            }
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to load config", e)
+        }
+    }
+
+    /** Toggle maintenance mode on/off. */
+    suspend fun setMaintenanceMode(
+        enabled: Boolean,
+        title: String,
+        message: String,
+        estimatedMinutes: Int?,
+    ): Resource<Unit> {
+        return try {
+            val config = hashMapOf<String, Any?>(
+                "isEnabled" to enabled,
+                "title" to title,
+                "message" to message,
+                "enabledAt" to if (enabled) FieldValue.serverTimestamp() else null,
+                "enabledBy" to if (enabled) (auth.currentUser?.uid ?: "") else "",
+            )
+            if (estimatedMinutes != null && enabled) {
+                val estimatedEnd = Date(System.currentTimeMillis() + estimatedMinutes * 60 * 1000L)
+                config["estimatedEnd"] = Timestamp(estimatedEnd)
+            } else {
+                config["estimatedEnd"] = null
+            }
+
+            firestore.document("config/maintenance").set(config).await()
+
+            auditLogger.log(
+                if (enabled) SAAction.MAINTENANCE_ON else SAAction.MAINTENANCE_OFF,
+                metadata = mapOf("title" to title),
+            )
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to set maintenance mode", e)
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // Force Update (Phase 4)
+    // ════════════════════════════════════════════════════════════
+
+    /** Fetch the full force update config. */
+    suspend fun getForceUpdateConfig(): Resource<ForceUpdateConfig> {
+        return try {
+            val doc = firestore.document("config/app_version").get().await()
+            val data = doc.data
+            if (data == null) {
+                Resource.Success(ForceUpdateConfig())
+            } else {
+                Resource.Success(
+                    ForceUpdateConfig(
+                        minimumVersionCode = (data["minimumVersionCode"] as? Number)?.toInt() ?: 0,
+                        latestVersionCode = (data["latestVersionCode"] as? Number)?.toInt() ?: 0,
+                        latestVersionName = data["latestVersionName"] as? String ?: "",
+                        playStoreUrl = data["playStoreUrl"] as? String ?: "",
+                        releaseNotes = data["releaseNotes"] as? String ?: "",
+                        isForceUpdate = data["isForceUpdate"] as? Boolean ?: false,
+                    ),
+                )
+            }
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to load config", e)
+        }
+    }
+
+    /** Save force update config. */
+    suspend fun setForceUpdateConfig(
+        minimumVersionCode: Int,
+        latestVersionCode: Int,
+        latestVersionName: String,
+        playStoreUrl: String,
+        releaseNotes: String,
+        isForceUpdate: Boolean,
+    ): Resource<Unit> {
+        return try {
+            val config = hashMapOf(
+                "minimumVersionCode" to minimumVersionCode,
+                "latestVersionCode" to latestVersionCode,
+                "latestVersionName" to latestVersionName,
+                "playStoreUrl" to playStoreUrl,
+                "releaseNotes" to releaseNotes,
+                "isForceUpdate" to isForceUpdate,
+            )
+            firestore.document("config/app_version").set(config).await()
+
+            auditLogger.log(
+                SAAction.FORCE_UPDATE_SET,
+                metadata = mapOf(
+                    "minCode" to minimumVersionCode,
+                    "latestCode" to latestVersionCode,
+                    "versionName" to latestVersionName,
+                    "isForceUpdate" to isForceUpdate,
+                ),
+            )
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to save config", e)
         }
     }
 

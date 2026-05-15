@@ -66,6 +66,37 @@ class ProfileViewModel @Inject constructor(
     private val _editState = MutableStateFlow(EditProfileState())
     val editState: StateFlow<EditProfileState> = _editState.asStateFlow()
 
+    init {
+        // Keep the profile screen live: any Firestore write to the user document
+        // (e.g. confirmDonation() updating totalDonations / lastDonationDate)
+        // will propagate here immediately without requiring a manual refresh.
+        observeCurrentUser()
+    }
+
+    /**
+     * Real-time observer for the current user document.
+     * Updates availability, cooldown and donation count whenever Firestore
+     * changes — covers the case where the user is already on ProfileScreen
+     * and a donation is confirmed from another screen in the backstack.
+     */
+    private fun observeCurrentUser() {
+        if (currentUserId.isBlank()) return
+        viewModelScope.launch {
+            userRepository.observeUser(currentUserId).collect { user ->
+                val (isAvailable, cooldownDays) = checkAvailability(user)
+                _profileState.update { state ->
+                    state.copy(
+                        user = user,
+                        isAvailable = isAvailable,
+                        cooldownDaysRemaining = cooldownDays,
+                        // Keep isLoading=false once the first emission arrives
+                        isLoading = false,
+                    )
+                }
+            }
+        }
+    }
+
     fun loadProfile() {
         viewModelScope.launch {
             _profileState.update { it.copy(isLoading = true, error = null) }
@@ -78,14 +109,13 @@ class ProfileViewModel @Inject constructor(
                 return@launch
             }
 
-            // Load communities
+            // Load communities (one-time — community list doesn’t change in real-time)
             val communities = mutableListOf<Community>()
             for (id in user.communityIds.take(20)) {
                 val comm = communityRepository.getCommunity(id)
                 if (comm is Resource.Success) communities.add(comm.data)
             }
 
-            // Calculate availability
             val (isAvailable, cooldownDays) = checkAvailability(user)
 
             _profileState.update {
@@ -157,9 +187,16 @@ class ProfileViewModel @Inject constructor(
                         s.copy(user = s.user?.copy(avatarUrl = url))
                     }
                 }
+
                 is Resource.Error -> {
-                    _editState.update { it.copy(isUploadingAvatar = false, error = "Avatar upload failed: ${result.message}") }
+                    _editState.update {
+                        it.copy(
+                            isUploadingAvatar = false,
+                            error = "Avatar upload failed: ${result.message}"
+                        )
+                    }
                 }
+
                 is Resource.Loading -> {}
             }
         }
@@ -189,9 +226,11 @@ class ProfileViewModel @Inject constructor(
                 is Resource.Success -> {
                     _editState.update { it.copy(isSaving = false, saveSuccess = true) }
                 }
+
                 is Resource.Error -> {
                     _editState.update { it.copy(isSaving = false, error = "Failed to save changes") }
                 }
+
                 is Resource.Loading -> {}
             }
         }

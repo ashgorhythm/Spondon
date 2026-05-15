@@ -258,7 +258,7 @@ fun SADashboardScreen(
                             icon = Icons.Outlined.Feedback,
                             label = "Feedback",
                             modifier = Modifier.weight(1f),
-                            onClick = { /* Phase 4 */ },
+                            onClick = { navController.navigate("sa_feedback") },
                         )
                     }
                 }
@@ -272,8 +272,22 @@ fun SADashboardScreen(
                             icon = Icons.Outlined.Build,
                             label = "Maintenance",
                             modifier = Modifier.weight(1f),
-                            onClick = { /* Phase 4 */ },
+                            onClick = { navController.navigate("sa_maintenance") },
                         )
+                        SAQuickAction(
+                            icon = Icons.Outlined.SystemUpdate,
+                            label = "Force Update",
+                            modifier = Modifier.weight(1f),
+                            onClick = { navController.navigate("sa_force_update") },
+                        )
+                    }
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         SAQuickAction(
                             icon = Icons.Outlined.Analytics,
                             label = "Analytics",

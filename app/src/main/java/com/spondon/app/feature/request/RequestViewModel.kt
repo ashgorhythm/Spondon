@@ -288,18 +288,23 @@ class RequestViewModel @Inject constructor(
 
             when (val result = requestRepository.createRequest(request)) {
                 is Resource.Success -> {
-                    _createState.update { it.copy(isSubmitting = false, isSuccess = true) }
-                    // Send notifications to matching blood group users in selected communities
+                    // !! Send notifications BEFORE setting isSuccess.
+                    // Setting isSuccess=true triggers popBackStack() which destroys
+                    // this ViewModel and cancels viewModelScope — any coroutine
+                    // launched AFTER that point is silently killed.
                     sendBloodGroupNotifications(
                         bloodGroup = state.bloodGroup,
                         communityIds = state.selectedCommunityIds,
                         hospital = state.hospital,
                         requestId = result.data,
                     )
+                    _createState.update { it.copy(isSubmitting = false, isSuccess = true) }
                 }
+
                 is Resource.Error -> {
                     _createState.update { it.copy(isSubmitting = false, error = result.message) }
                 }
+
                 is Resource.Loading -> {}
             }
         }
@@ -361,9 +366,11 @@ class RequestViewModel @Inject constructor(
                         )
                     }
                 }
+
                 is Resource.Error -> {
                     _detailState.update { it.copy(isLoading = false, error = result.message) }
                 }
+
                 is Resource.Loading -> {}
             }
         }
@@ -403,9 +410,11 @@ class RequestViewModel @Inject constructor(
                         )
                     }
                 }
+
                 is Resource.Error -> {
                     _detailState.update { it.copy(isResponding = false, error = result.message) }
                 }
+
                 is Resource.Loading -> {}
             }
         }
@@ -420,6 +429,7 @@ class RequestViewModel @Inject constructor(
                         it.copy(request = it.request?.copy(status = status))
                     }
                 }
+
                 else -> {}
             }
         }
@@ -585,62 +595,66 @@ class RequestViewModel @Inject constructor(
      * Sends notifications to every community member whose stored blood group
      * matches the requested blood group.
      *
+     * IMPORTANT: this is a suspend fun — it must be called directly inside the
+     * submitRequest() coroutine, BEFORE isSuccess is set to true.  Launching
+     * it in a separate viewModelScope.launch{} after isSuccess=true means the
+     * ViewModel is destroyed (by navigation) before the coroutine completes.
+     *
      * Uses a single batch Firestore read (getUsers) instead of one read per
      * member, and applies normalizeBloodGroup() so that Unicode minus variants
      * stored by older app versions are still matched correctly.
      */
-    private fun sendBloodGroupNotifications(
+    private suspend fun sendBloodGroupNotifications(
         bloodGroup: String,
         communityIds: List<String>,
         hospital: String,
         requestId: String,
     ) {
-        viewModelScope.launch {
-            try {
-                val uid = auth.currentUser?.uid ?: return@launch
-                val normalizedTarget = normalizeBloodGroup(bloodGroup)
+        try {
+            val uid = auth.currentUser?.uid ?: return
+            val normalizedTarget = normalizeBloodGroup(bloodGroup)
 
-                // ── Step 1: collect every unique member ID across all selected communities ──
-                val allMemberIds = mutableSetOf<String>()
-                communityIds.forEach { communityId ->
-                    when (val res = communityRepository.getCommunity(communityId)) {
-                        is Resource.Success -> {
-                            allMemberIds.addAll(res.data.memberIds)
-                            allMemberIds.addAll(res.data.adminIds)
-                            allMemberIds.addAll(res.data.moderatorIds)
-                        }
-                        else -> {}
+            // ── Step 1: collect every unique member ID across all selected communities ──
+            val allMemberIds = mutableSetOf<String>()
+            communityIds.forEach { communityId ->
+                when (val res = communityRepository.getCommunity(communityId)) {
+                    is Resource.Success -> {
+                        allMemberIds.addAll(res.data.memberIds)
+                        allMemberIds.addAll(res.data.adminIds)
+                        allMemberIds.addAll(res.data.moderatorIds)
                     }
+
+                    else -> {}
                 }
-                allMemberIds.remove(uid) // requester never notifies themselves
-                if (allMemberIds.isEmpty()) return@launch
-
-                // ── Step 2: batch-fetch all profiles in one Firestore call ──────────────
-                val usersResult = userRepository.getUsers(allMemberIds.toList())
-                val members = (usersResult as? Resource.Success)?.data ?: return@launch
-
-                // ── Step 3: keep only users whose blood group matches (normalized) ──────
-                val matchingIds = members
-                    .filter { user ->
-                        user.uid.isNotBlank() &&
-                        normalizeBloodGroup(user.bloodGroup) == normalizedTarget
-                    }
-                    .map { it.uid }
-
-                if (matchingIds.isEmpty()) return@launch
-
-                // ── Step 4: write notification docs for each matched user ───────────────
-                notificationRepository.sendNotificationToUsers(
-                    userIds = matchingIds,
-                    type = NotificationType.REQUEST,
-                    title = "\uD83E\uDE78 $bloodGroup Blood Needed!",
-                    body = "A $bloodGroup blood request has been posted at $hospital. Your blood group matches — tap to respond!",
-                    deepLink = "request_detail/$requestId",
-                )
-            } catch (_: Exception) {
-                // Silently fail — request creation must never be blocked by a
-                // notification dispatch error.
             }
+            allMemberIds.remove(uid) // requester never notifies themselves
+            if (allMemberIds.isEmpty()) return
+
+            // ── Step 2: batch-fetch all profiles in one Firestore call ──────────────
+            val usersResult = userRepository.getUsers(allMemberIds.toList())
+            val members = (usersResult as? Resource.Success)?.data ?: return
+
+            // ── Step 3: keep only users whose blood group matches (normalized) ──────
+            val matchingIds = members
+                .filter { user ->
+                    user.uid.isNotBlank() &&
+                            normalizeBloodGroup(user.bloodGroup) == normalizedTarget
+                }
+                .map { it.uid }
+
+            if (matchingIds.isEmpty()) return
+
+            // ── Step 4: write notification docs for each matched user ───────────────
+            notificationRepository.sendNotificationToUsers(
+                userIds = matchingIds,
+                type = NotificationType.REQUEST,
+                title = "\uD83E\uDE78 $bloodGroup Blood Needed!",
+                body = "A $bloodGroup blood request has been posted at $hospital. Your blood group matches — tap to respond!",
+                deepLink = "request_detail/$requestId",
+            )
+        } catch (_: Exception) {
+            // Silently fail — request creation must never be blocked by a
+            // notification dispatch error.
         }
     }
 

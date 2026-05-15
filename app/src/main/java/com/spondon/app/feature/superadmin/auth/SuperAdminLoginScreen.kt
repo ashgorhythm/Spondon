@@ -44,6 +44,28 @@ fun SuperAdminLoginScreen(
         }
     }
 
+    // If SA not registered, redirect to registration screen
+    LaunchedEffect(state.isInitialized, state.isRegistered) {
+        if (state.isInitialized && !state.isRegistered) {
+            navController.navigate("sa_register") {
+                popUpTo("sa_login") { inclusive = true }
+            }
+        }
+    }
+
+    // Collect one-shot navigation events from ViewModel
+    LaunchedEffect(Unit) {
+        viewModel.navEvent.collect { event ->
+            when (event) {
+                is SANavEvent.GoToRegister -> {
+                    navController.navigate("sa_register") {
+                        popUpTo("sa_login") { inclusive = true }
+                    }
+                }
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()

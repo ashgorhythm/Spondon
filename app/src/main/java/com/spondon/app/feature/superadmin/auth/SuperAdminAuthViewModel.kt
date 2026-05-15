@@ -6,13 +6,22 @@ import com.google.firebase.auth.FirebaseAuth
 import com.spondon.app.core.common.Resource
 import com.spondon.app.feature.superadmin.data.SARepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+/** Navigation events emitted by the SA auth ViewModel. */
+sealed class SANavEvent {
+    /** SA not yet registered — redirect caller to the registration screen. */
+    data object GoToRegister : SANavEvent()
+}
 
 data class SAAuthState(
     val email: String = "",
@@ -45,6 +54,9 @@ class SuperAdminAuthViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(SAAuthState())
     val state: StateFlow<SAAuthState> = _state.asStateFlow()
+
+    private val _navEvent = MutableSharedFlow<SANavEvent>(extraBufferCapacity = 1)
+    val navEvent: SharedFlow<SANavEvent> = _navEvent.asSharedFlow()
 
     init {
         checkRegistrationStatus()
@@ -109,6 +121,12 @@ class SuperAdminAuthViewModel @Inject constructor(
 
     fun login() {
         val s = _state.value
+
+        // If SA is not registered yet, redirect to registration
+        if (!s.isRegistered) {
+            _navEvent.tryEmit(SANavEvent.GoToRegister)
+            return
+        }
 
         // Check lockout
         if (s.lockoutEndTime > System.currentTimeMillis()) {

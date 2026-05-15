@@ -109,6 +109,99 @@ class DonorViewModel @Inject constructor(
     private val _achievementsState = MutableStateFlow(AchievementsState())
     val achievementsState: StateFlow<AchievementsState> = _achievementsState.asStateFlow()
 
+    init {
+        observeCurrentUser()
+    }
+
+    /**
+     * Listens to the current user’s Firestore document in real-time.
+     *
+     * When [totalDonations] or [lastDonationDate] changes (i.e. after a
+     * donation is confirmed by a requester), this automatically:
+     *   • refreshes the donation history list from Firestore
+     *   • recalculates the 120-day eligibility countdown
+     *   • recalculates earned badges
+     *
+     * This solves the stale-data problem where DonationHistoryScreen and
+     * AchievementsScreen stay open in the backstack while another screen
+     * (RequestDetailScreen) confirms a donation.
+     */
+    private fun observeCurrentUser() {
+        if (currentUserId.isBlank()) return
+        viewModelScope.launch {
+            var previousDonationCount = -1
+            userRepository.observeUser(currentUserId).collect { user ->
+                val (isEligible, cooldownDays) = checkAvailability(user)
+
+                // ── Update history state ─────────────────────────────────
+                val countChanged = previousDonationCount != -1 &&
+                        user.totalDonations != previousDonationCount
+                previousDonationCount = user.totalDonations
+
+                // Reload donations list whenever count changes OR first emission
+                val donations = if (countChanged || _historyState.value.donations.isEmpty()) {
+                    (donorRepository.getDonationHistory(currentUserId) as? Resource.Success)?.data
+                        ?: _historyState.value.donations
+                } else {
+                    _historyState.value.donations
+                }
+
+                _historyState.update {
+                    it.copy(
+                        user = user,
+                        donations = donations,
+                        totalDonations = user.totalDonations,
+                        nextEligibleDays = cooldownDays,
+                        isEligibleNow = isEligible,
+                        isLoading = false,
+                    )
+                }
+
+                // ── Update achievements state ─────────────────────────────
+                recalculateBadges(user)
+            }
+        }
+    }
+
+    /** Recalculates badge list from [user.totalDonations] and persists newly earned ones. */
+    private fun recalculateBadges(user: com.spondon.app.core.domain.model.User) {
+        val totalDonations = user.totalDonations
+        val earnedBadges = user.badges
+
+        val allBadges = listOf(
+            Badge("first_drop", "First Drop", "Complete your first blood donation", "🩸", 1),
+            Badge("life_saver", "Life Saver", "Complete 5 blood donations", "💉", 5),
+            Badge("hero_donor", "Hero Donor", "Complete 10 blood donations", "🦸", 10),
+            Badge("legend", "Donation Legend", "Complete 25 blood donations", "🏆", 25),
+            Badge("champion", "Community Champion", "Complete 50 blood donations", "👑", 50),
+            Badge("century", "Century Donor", "Complete 100 blood donations", "💯", 100),
+        ).map { badge ->
+            when {
+                totalDonations >= badge.criteria && earnedBadges.contains(badge.id) ->
+                    badge.copy(earnedDate = user.createdAt)
+
+                totalDonations >= badge.criteria ->
+                    badge.copy(earnedDate = Date())
+
+                else -> badge
+            }
+        }
+
+        // Persist newly earned badges back to Firestore
+        val newBadgeIds = allBadges.filter { it.earnedDate != null }.map { it.id }
+        if (newBadgeIds.toSet() != earnedBadges.toSet()) {
+            viewModelScope.launch { userRepository.updateUser(user.copy(badges = newBadgeIds)) }
+        }
+
+        _achievementsState.update {
+            it.copy(
+                badges = allBadges,
+                totalDonations = totalDonations,
+                isLoading = false,
+            )
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════
     // Find Donor
     // ═══════════════════════════════════════════════════════════
@@ -171,9 +264,11 @@ class DonorViewModel @Inject constructor(
 
                     _findState.update { it.copy(donors = donors, isLoading = false) }
                 }
+
                 is Resource.Error -> {
                     _findState.update { it.copy(isLoading = false, error = result.message) }
                 }
+
                 is Resource.Loading -> {}
             }
         }
@@ -301,48 +396,14 @@ class DonorViewModel @Inject constructor(
     // ═══════════════════════════════════════════════════════════
 
     fun loadAchievements() {
+        // The real-time observer in observeCurrentUser() already drives
+        // _achievementsState.  This explicit call is kept for the initial load
+        // on screens that open without a prior user-document emission.
         viewModelScope.launch {
-            _achievementsState.update { it.copy(isLoading = true, error = null) }
-
+            _achievementsState.update { it.copy(isLoading = true) }
             val userResult = userRepository.getUser(currentUserId)
-            val user = (userResult as? Resource.Success)?.data
-            val totalDonations = user?.totalDonations ?: 0
-            val earnedBadges = user?.badges ?: emptyList()
-
-            val allBadges = listOf(
-                Badge("first_drop", "First Drop", "Complete your first blood donation", "🩸", 1),
-                Badge("life_saver", "Life Saver", "Complete 5 blood donations", "💉", 5),
-                Badge("hero_donor", "Hero Donor", "Complete 10 blood donations", "🦸", 10),
-                Badge("legend", "Donation Legend", "Complete 25 blood donations", "🏆", 25),
-                Badge("champion", "Community Champion", "Complete 50 blood donations", "👑", 50),
-                Badge("century", "Century Donor", "Complete 100 blood donations", "💯", 100),
-            ).map { badge ->
-                if (totalDonations >= badge.criteria && earnedBadges.contains(badge.id)) {
-                    badge.copy(earnedDate = user?.createdAt) // Use approximate date
-                } else if (totalDonations >= badge.criteria) {
-                    badge.copy(earnedDate = Date()) // Newly earned
-                } else {
-                    badge
-                }
-            }
-
-            // Auto-award any new badges
-            val newBadgeIds = allBadges
-                .filter { it.earnedDate != null }
-                .map { it.id }
-            if (newBadgeIds.toSet() != earnedBadges.toSet() && user != null) {
-                viewModelScope.launch {
-                    userRepository.updateUser(user.copy(badges = newBadgeIds))
-                }
-            }
-
-            _achievementsState.update {
-                it.copy(
-                    badges = allBadges,
-                    totalDonations = totalDonations,
-                    isLoading = false,
-                )
-            }
+            val user = (userResult as? Resource.Success)?.data ?: return@launch
+            recalculateBadges(user)
         }
     }
 
