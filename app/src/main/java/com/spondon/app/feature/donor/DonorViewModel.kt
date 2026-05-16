@@ -16,8 +16,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.Date
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -130,36 +132,46 @@ class DonorViewModel @Inject constructor(
         if (currentUserId.isBlank()) return
         viewModelScope.launch {
             var previousDonationCount = -1
-            userRepository.observeUser(currentUserId).collect { user ->
-                val (isEligible, cooldownDays) = checkAvailability(user)
-
-                // ── Update history state ─────────────────────────────────
-                val countChanged = previousDonationCount != -1 &&
-                        user.totalDonations != previousDonationCount
-                previousDonationCount = user.totalDonations
-
-                // Reload donations list whenever count changes OR first emission
-                val donations = if (countChanged || _historyState.value.donations.isEmpty()) {
-                    (donorRepository.getDonationHistory(currentUserId) as? Resource.Success)?.data
-                        ?: _historyState.value.donations
-                } else {
-                    _historyState.value.donations
+            // Use distinctUntilChanged keyed on fields that matter for the UI
+            // to prevent redundant recompositions when unrelated fields change.
+            userRepository.observeUser(currentUserId)
+                .distinctUntilChanged { old, new ->
+                    old.totalDonations == new.totalDonations &&
+                            old.lastDonationDate == new.lastDonationDate &&
+                            old.badges == new.badges &&
+                            old.availabilityOverride == new.availabilityOverride &&
+                            old.donationInterval == new.donationInterval
                 }
+                .collect { user ->
+                    val (isEligible, cooldownDays) = checkAvailability(user)
 
-                _historyState.update {
-                    it.copy(
-                        user = user,
-                        donations = donations,
-                        totalDonations = user.totalDonations,
-                        nextEligibleDays = cooldownDays,
-                        isEligibleNow = isEligible,
-                        isLoading = false,
-                    )
+                    // ── Update history state ─────────────────────────────────
+                    val countChanged = previousDonationCount != -1 &&
+                            user.totalDonations != previousDonationCount
+                    previousDonationCount = user.totalDonations
+
+                    // Reload donations list whenever count changes OR first emission
+                    val donations = if (countChanged || _historyState.value.donations.isEmpty()) {
+                        (donorRepository.getDonationHistory(currentUserId) as? Resource.Success)?.data
+                            ?: _historyState.value.donations
+                    } else {
+                        _historyState.value.donations
+                    }
+
+                    _historyState.update {
+                        it.copy(
+                            user = user,
+                            donations = donations,
+                            totalDonations = user.totalDonations,
+                            nextEligibleDays = cooldownDays,
+                            isEligibleNow = isEligible,
+                            isLoading = false,
+                        )
+                    }
+
+                    // ── Update achievements state ─────────────────────────────
+                    recalculateBadges(user)
                 }
-
-                // ── Update achievements state ─────────────────────────────
-                recalculateBadges(user)
-            }
         }
     }
 
@@ -187,10 +199,20 @@ class DonorViewModel @Inject constructor(
             }
         }
 
-        // Persist newly earned badges back to Firestore
+        // Persist newly earned badges using a targeted field-level update
+        // instead of a full-document write to avoid re-triggering the snapshot
+        // listener with all user fields (which caused infinite flickering).
         val newBadgeIds = allBadges.filter { it.earnedDate != null }.map { it.id }
         if (newBadgeIds.toSet() != earnedBadges.toSet()) {
-            viewModelScope.launch { userRepository.updateUser(user.copy(badges = newBadgeIds)) }
+            viewModelScope.launch {
+                try {
+                    val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    firestore.collection(com.spondon.app.core.common.Constants.USERS_COLLECTION)
+                        .document(user.uid)
+                        .update("badges", newBadgeIds)
+                        .await()
+                } catch (_: Exception) { }
+            }
         }
 
         _achievementsState.update {

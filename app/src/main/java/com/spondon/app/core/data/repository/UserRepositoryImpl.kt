@@ -30,6 +30,7 @@ class UserRepositoryImpl @Inject constructor(
             is Resource.Success -> Resource.Success(
                 result.data.map { data -> mapToUser(data["uid"] as? String ?: "", data) }
             )
+
             is Resource.Error -> Resource.Error(result.message)
             is Resource.Loading -> Resource.Loading
         }
@@ -53,6 +54,7 @@ class UserRepositoryImpl @Inject constructor(
             "upazila" to user.upazila,
             "isPhoneVisible" to user.isPhoneVisible,
             "badges" to user.badges,
+            "communityIds" to user.communityIds,
         )
         return firestoreService.updateUser(user.uid, data)
     }

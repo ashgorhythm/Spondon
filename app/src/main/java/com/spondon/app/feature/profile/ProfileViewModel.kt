@@ -15,6 +15,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Date
@@ -82,18 +83,28 @@ class ProfileViewModel @Inject constructor(
     private fun observeCurrentUser() {
         if (currentUserId.isBlank()) return
         viewModelScope.launch {
-            userRepository.observeUser(currentUserId).collect { user ->
-                val (isAvailable, cooldownDays) = checkAvailability(user)
-                _profileState.update { state ->
-                    state.copy(
-                        user = user,
-                        isAvailable = isAvailable,
-                        cooldownDaysRemaining = cooldownDays,
-                        // Keep isLoading=false once the first emission arrives
-                        isLoading = false,
-                    )
+            userRepository.observeUser(currentUserId)
+                .distinctUntilChanged { old, new ->
+                    old.totalDonations == new.totalDonations &&
+                            old.lastDonationDate == new.lastDonationDate &&
+                            old.badges == new.badges &&
+                            old.availabilityOverride == new.availabilityOverride &&
+                            old.donationInterval == new.donationInterval &&
+                            old.name == new.name &&
+                            old.avatarUrl == new.avatarUrl
                 }
-            }
+                .collect { user ->
+                    val (isAvailable, cooldownDays) = checkAvailability(user)
+                    _profileState.update { state ->
+                        state.copy(
+                            user = user,
+                            isAvailable = isAvailable,
+                            cooldownDaysRemaining = cooldownDays,
+                            // Keep isLoading=false once the first emission arrives
+                            isLoading = false,
+                        )
+                    }
+                }
         }
     }
 

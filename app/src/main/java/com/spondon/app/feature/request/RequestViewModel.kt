@@ -1,5 +1,6 @@
 package com.spondon.app.feature.request
 
+
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.Calendar
 import java.util.Date
 import java.util.concurrent.TimeUnit
@@ -444,38 +446,64 @@ class RequestViewModel @Inject constructor(
     fun confirmDonation(donorUserId: String) {
         val request = _detailState.value.request ?: return
         viewModelScope.launch {
+            // 1. Fetch donor and update profile
+            val donorResult = userRepository.getUser(donorUserId)
+            if (donorResult !is Resource.Success || donorResult.data == null) {
+                _detailState.update { it.copy(error = "Donor not found") }
+                return@launch
+            }
+
+            val donor = donorResult.data
+            val updatedDonor = donor.copy(
+                totalDonations = donor.totalDonations + 1,
+                lastDonationDate = Date(),
+                availabilityOverride = false,
+                donationInterval = 120,
+            )
+
+            // Update donor profile using direct Firestore update (most reliable)
             try {
-                // 1. Update donor's profile (increment totalDonations, set lastDonationDate, reset override)
-                val donorResult = userRepository.getUser(donorUserId)
-                val donor = (donorResult as? Resource.Success)?.data ?: return@launch
-                val updatedDonor = donor.copy(
-                    totalDonations = donor.totalDonations + 1,
-                    lastDonationDate = Date(),
-                    availabilityOverride = false,
-                    donationInterval = 120, // 120-day cooldown
+                val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                val updates = mapOf(
+                    "totalDonations" to updatedDonor.totalDonations,
+                    "lastDonationDate" to com.google.firebase.Timestamp(updatedDonor.lastDonationDate!!),
+                    "availabilityOverride" to false,
+                    "donationInterval" to 120,
                 )
-                userRepository.updateUser(updatedDonor)
+                firestore.collection(Constants.USERS_COLLECTION)
+                    .document(donorUserId)
+                    .update(updates)
+                    .await()
+            } catch (_: Exception) {
+                // Proceed with recording the donation and fulfilling the request even if profile update fails
+            }
 
-                // 2. Create a donation record in the donations collection
-                donorRepository.recordDonation(
-                    Donation(
-                        requestId = request.id,
-                        donorId = donorUserId,
-                        hospital = request.hospital,
-                        bloodGroup = request.bloodGroup,
-                        date = Date(),
-                        status = DonationStatus.CONFIRMED,
-                        confirmedBy = currentUserId,
-                    )
+            // 2. Record donation
+            val recordResult = donorRepository.recordDonation(
+                Donation(
+                    requestId = request.id,
+                    donorId = donorUserId,
+                    hospital = request.hospital,
+                    bloodGroup = request.bloodGroup,
+                    date = Date(),
+                    status = DonationStatus.CONFIRMED,
+                    confirmedBy = currentUserId,
                 )
+            )
 
-                // 3. Mark request as fulfilled
-                requestRepository.updateRequestStatus(request.id, RequestStatus.FULFILLED)
-                _detailState.update {
-                    it.copy(request = it.request?.copy(status = RequestStatus.FULFILLED))
-                }
+            if (recordResult is Resource.Error) {
+                _detailState.update { it.copy(error = "Failed to record donation: ${recordResult.message}") }
+                return@launch
+            }
 
-                // 4. Notify the donor
+            // 3. Mark request fulfilled
+            requestRepository.updateRequestStatus(request.id, RequestStatus.FULFILLED)
+            _detailState.update {
+                it.copy(request = it.request?.copy(status = RequestStatus.FULFILLED))
+            }
+
+            // 4. Notify donor (non-critical)
+            try {
                 notificationRepository.sendNotificationToUsers(
                     userIds = listOf(donorUserId),
                     type = NotificationType.DONATION,
@@ -483,12 +511,11 @@ class RequestViewModel @Inject constructor(
                     body = "Your blood donation for ${request.bloodGroup} at ${request.hospital} has been confirmed. Thank you for saving a life!",
                     deepLink = "request_detail/${request.id}",
                 )
-
-                // 5. Reload the detail so the UI reflects the new status
-                loadRequestDetail(request.id)
             } catch (_: Exception) {
-                // silently fail — don't block UI
             }
+
+            // 5. Reload detail
+            loadRequestDetail(request.id)
         }
     }
 

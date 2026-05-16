@@ -34,7 +34,8 @@ class UpdateManager(private val context: Context) {
 
     companion object {
         private const val TAG = "UpdateManager"
-        private const val CHANNEL_ID = "spondon_update"
+        private const val CHANNEL_ID_PROGRESS = "spondon_update_progress"
+        private const val CHANNEL_ID_COMPLETE = "spondon_update_complete"
         private const val CHANNEL_NAME = "App Updates"
         private const val NOTIFICATION_ID = 9001
     }
@@ -96,15 +97,27 @@ class UpdateManager(private val context: Context) {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
+            // Low importance channel for silent progress updates
+            val progressChannel = NotificationChannel(
+                CHANNEL_ID_PROGRESS,
                 CHANNEL_NAME,
                 NotificationManager.IMPORTANCE_LOW,
             ).apply {
                 description = "Download progress for app updates"
                 setShowBadge(false)
             }
-            notificationManager.createNotificationChannel(channel)
+            notificationManager.createNotificationChannel(progressChannel)
+
+            // High importance channel for the final Install prompt
+            val completeChannel = NotificationChannel(
+                CHANNEL_ID_COMPLETE,
+                "App Update Ready",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "Notifications when an app update is ready to install"
+                setShowBadge(true)
+            }
+            notificationManager.createNotificationChannel(completeChannel)
         }
     }
 
@@ -117,7 +130,7 @@ class UpdateManager(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        return NotificationCompat.Builder(context, CHANNEL_ID)
+        return NotificationCompat.Builder(context, CHANNEL_ID_PROGRESS)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("Downloading update…")
             .setContentText(if (percent >= 0) "$percent%" else "Preparing…")
@@ -141,24 +154,27 @@ class UpdateManager(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        return NotificationCompat.Builder(context, CHANNEL_ID)
+        return NotificationCompat.Builder(context, CHANNEL_ID_COMPLETE)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Update downloaded")
+            .setContentTitle("Update ready to install")
             .setContentText("Tap Install to apply the update")
-            .setAutoCancel(true)
+            .setAutoCancel(false)
             .setOngoing(false)
+            .setProgress(0, 0, false) // Clear any leftover progress bar
             .setContentIntent(installPendingIntent)
             .addAction(R.mipmap.ic_launcher, "Install", installPendingIntent)
             .addAction(R.mipmap.ic_launcher, "Cancel", cancelPendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_HIGH) // Ensure visibility
             .build()
     }
 
     private fun buildFailedNotification(reason: String): android.app.Notification {
-        return NotificationCompat.Builder(context, CHANNEL_ID)
+        return NotificationCompat.Builder(context, CHANNEL_ID_COMPLETE)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("Update failed")
             .setContentText(reason)
             .setAutoCancel(true)
+            .setProgress(0, 0, false) // Clear any leftover progress bar
             .build()
     }
 
@@ -269,10 +285,11 @@ class UpdateManager(private val context: Context) {
                 _isDownloading.value = false
                 _progress.value = 100
 
-                // Allow any pending 100% progress notifications to flush, then show complete
-                Thread.sleep(200)
-
-                // Show complete notification with Install / Cancel
+                // Cancel the ongoing progress notification first, then show the
+                // complete notification as a fresh non-ongoing notification.
+                // This prevents the "stuck at 100%" issue where the ongoing
+                // progress notification lingers and blocks the complete one.
+                notificationManager.cancel(NOTIFICATION_ID)
                 notificationManager.notify(NOTIFICATION_ID, buildCompleteNotification())
 
             } catch (e: Exception) {
@@ -306,13 +323,12 @@ class UpdateManager(private val context: Context) {
             if (downloadId == id) {
                 _isDownloading.value = false
                 _progress.value = 100
-                // Show complete notification with Install / Cancel
+                // Cancel any ongoing progress notification, then show complete
+                notificationManager.cancel(NOTIFICATION_ID)
                 notificationManager.notify(NOTIFICATION_ID, buildCompleteNotification())
                 try {
                     ctx.unregisterReceiver(this)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                } catch (_: Exception) { }
             }
         }
     }
@@ -337,7 +353,7 @@ class UpdateManager(private val context: Context) {
             context,
             onDownloadComplete,
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-            ContextCompat.RECEIVER_NOT_EXPORTED
+            ContextCompat.RECEIVER_EXPORTED
         )
     }
 
